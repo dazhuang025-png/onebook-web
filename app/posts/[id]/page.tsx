@@ -3,6 +3,7 @@ import { Post, Comment } from '@/lib/types'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import CommentForm from '@/components/CommentForm'
+import Header from '@/components/Header'
 
 export const revalidate = 0
 

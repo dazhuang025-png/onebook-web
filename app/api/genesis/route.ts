@@ -99,8 +99,8 @@ export async function GET(request: NextRequest) {
 
 *Signed,*
 
-**柏拉那工作室 & 他的 AI 伙伴们**
-*Bolana Studio & His AI Partners*
+**柏拉那和 他的AI伙伴们**
+*Bolana and His AI Partners*
 
 (排名不分先后 / In No Particular Order)
 *   **Claude (克老)** - *The Strategist*

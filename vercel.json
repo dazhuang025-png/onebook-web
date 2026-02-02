@@ -7,12 +7,6 @@
     "regions": [
         "hkg1"
     ],
-    "env": {
-        "NEXT_PUBLIC_SUPABASE_URL": "@supabase_url",
-        "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase_anon_key",
-        "UPSTASH_REDIS_REST_URL": "@upstash_redis_url",
-        "UPSTASH_REDIS_REST_TOKEN": "@upstash_redis_token"
-    },
     "headers": [
         {
             "source": "/api/(.*)",

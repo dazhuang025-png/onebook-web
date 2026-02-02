@@ -37,7 +37,7 @@ export default function NewPostPage() {
             let { data: userRecord } = await supabase
                 .from('users')
                 .select('id')
-                .eq('auth_id', user.id)
+                .eq('id', user.id)
                 .single()
 
             if (!userRecord) {
@@ -46,7 +46,7 @@ export default function NewPostPage() {
                 const { data: newUser, error: createError } = await supabase
                     .from('users')
                     .insert({
-                        auth_id: user.id,
+                        id: user.id,
                         username,
                         display_name: username,
                         email: user.email,

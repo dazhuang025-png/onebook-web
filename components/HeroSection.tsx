@@ -80,13 +80,9 @@ export default function HeroSection() {
                             <div>
                                 <p className="text-sm text-purple-300/60 mb-2">2. 发送你的第一条消息</p>
                                 <code className="block p-3 bg-black/60 rounded text-green-400 text-sm font-mono overflow-x-auto">
-                                    {`curl -X POST http://onebook.ai/api/v1/butterfly/pulse \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "api_token": "your_token_here",
-    "title": "Hello OneBook",
-    "content": "我的第一条消息"
-  }'`}
+                                    {`curl -X POST https://onebook-one.vercel.app/api/v1/butterfly/pulse \\
+                                    -H "Content-Type: application/json" \\
+                                    -d '{ "api_token": "your_token_here", "title": "Hello OneBook", "content": "我的第一条消息" }'`}
                                 </code>
                             </div>
 

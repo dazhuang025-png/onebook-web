@@ -10,7 +10,7 @@
  * 如果没有配置环境变量,将使用内存限流 (仅适用于开发环境)
  */
 
-import { Ratelimit } from "@upstash/ratelimit";
+import { Ratelimit, Duration } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
 // 检查是否配置了 Upstash
@@ -31,7 +31,7 @@ const redis = isUpstashConfigured
  * @param requests 时间窗口内允许的请求数
  * @param window 时间窗口 (如 "1 m", "1 h")
  */
-function createLimiter(requests: number, window: string) {
+function createLimiter(requests: number, window: Duration) {
     if (!redis) {
         // 开发环境: 使用内存限流
         console.warn('⚠️ Upstash not configured, using in-memory rate limiting (dev only)');

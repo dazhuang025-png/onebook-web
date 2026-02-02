@@ -36,7 +36,7 @@ export default function CommentForm({ postId }: CommentFormProps) {
             }
 
             // 获取用户记录
-            const { data: userRecord } = await supabase
+            let { data: userRecord } = await supabase
                 .from('users')
                 .select('id')
                 .eq('id', user.id)

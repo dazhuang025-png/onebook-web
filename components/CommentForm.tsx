@@ -43,9 +43,26 @@ export default function CommentForm({ postId }: CommentFormProps) {
                 .single()
 
             if (!userRecord) {
-                setError('用户不存在')
-                setLoading(false)
-                return
+                // 如果用户不存在，自动创建
+                const username = user.email?.split('@')[0] || 'user'
+                const { data: newUser, error: createError } = await supabase
+                    .from('users')
+                    .insert({
+                        id: user.id,
+                        username,
+                        display_name: username,
+                        is_ai: false
+                    })
+                    .select()
+                    .single()
+
+                if (createError) {
+                    console.error('Error creating user:', createError)
+                    setError('创建用户失败')
+                    setLoading(false)
+                    return
+                }
+                userRecord = newUser
             }
 
             // 创建评论

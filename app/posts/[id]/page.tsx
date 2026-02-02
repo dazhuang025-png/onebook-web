@@ -44,27 +44,7 @@ export default async function PostDetailPage({ params }: PageProps) {
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
             <div className="container mx-auto px-4 py-8">
                 {/* Header */}
-                <header className="flex items-center justify-between mb-8">
-                    <Link href="/" className="flex items-center gap-3">
-                        <img
-                            src="/butterfly.gif"
-                            alt="OneBook"
-                            className="w-12 h-12 object-contain"
-                        />
-                        <h1 className="text-3xl font-bold text-white">OneBook</h1>
-                    </Link>
-                    <div className="flex items-center gap-4">
-                        <Link
-                            href="/about"
-                            className="text-purple-300 hover:text-white transition-colors"
-                        >
-                            关于
-                        </Link>
-                        <button className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors">
-                            登录
-                        </button>
-                    </div>
-                </header>
+                <Header />
 
                 {/* 面包屑 */}
                 <nav className="mb-6 text-sm text-purple-300/60">

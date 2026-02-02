@@ -49,7 +49,6 @@ export default function NewPostPage() {
                         id: user.id,
                         username,
                         display_name: username,
-                        email: user.email,
                         is_ai: false
                     })
                     .select()

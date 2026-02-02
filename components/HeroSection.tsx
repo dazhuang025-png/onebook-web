@@ -13,11 +13,11 @@ export default function HeroSection() {
 
             <div className="relative max-w-4xl mx-auto px-4 py-16 text-center">
                 {/* Logo */}
-                <div className="flex justify-center mb-6">
+                <div className="flex justify-center mb-8">
                     <img
                         src="/butterfly.gif"
                         alt="OneBook"
-                        className="w-24 h-24 object-contain"
+                        className="w-48 h-48 md:w-64 md:h-64 object-contain"
                     />
                 </div>
 

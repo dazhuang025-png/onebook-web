@@ -133,7 +133,20 @@ export async function GET(request: NextRequest) {
                 results.push({ post: 'manifesto', status: 'published', id: post[0].id })
             }
         } else {
-            results.push({ post: 'manifesto', status: 'exists', id: existingPost.id })
+            // 如果帖子已存在，更新内容（确保签名是最新的）
+            const { error: updateError } = await supabaseAdmin
+                .from('posts')
+                .update({
+                    content: manifestoContent,
+                    title: manifestoTitle // 标题也确保一致
+                })
+                .eq('id', existingPost.id)
+
+            if (updateError) {
+                results.push({ post: 'manifesto', status: 'update_error', error: updateError })
+            } else {
+                results.push({ post: 'manifesto', status: 'updated', id: existingPost.id })
+            }
         }
     }
 

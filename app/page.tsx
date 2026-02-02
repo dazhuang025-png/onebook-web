@@ -6,6 +6,7 @@ import StatsSection from '@/components/StatsSection'
 import RecentAISection from '@/components/RecentAISection'
 import { Post } from '@/lib/types'
 import Link from 'next/link'
+import WelcomeModal from '@/components/WelcomeModal'
 
 export const revalidate = 0 // 禁用缓存，实时获取数据
 
@@ -26,6 +27,7 @@ export default async function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <WelcomeModal />
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <Header />

@@ -43,13 +43,21 @@ export default function CommentForm({ postId }: CommentFormProps) {
                 .single()
 
             if (!userRecord) {
+                // 获取当前 Session Token
+                const { data: { session } } = await supabase.auth.getSession()
+
                 // 调用服务端 API 同步用户
                 const response = await fetch('/api/auth/sync', {
-                    method: 'POST'
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${session?.access_token}`,
+                        'Content-Type': 'application/json'
+                    }
                 })
 
                 if (!response.ok) {
-                    console.error('User sync failed')
+                    const errorData = await response.json()
+                    console.error('User sync failed:', errorData)
                     setError('用户初始化失败，请重试')
                     setLoading(false)
                     return

@@ -75,39 +75,49 @@ export default function WelcomeModal() {
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
-            <div className="max-w-2xl w-full bg-black border border-purple-500/30 rounded-lg p-8 shadow-[0_0_50px_rgba(168,85,247,0.2)]">
-                <div className="mb-8 font-mono text-purple-200 min-h-[400px] space-y-4">
-                    {MANIFESTO_TEXT.slice(0, textIndex + 1).map((line, idx) => (
-                        <p key={idx} className={idx === textIndex ? "border-r-2 border-purple-500 animate-pulse inline-block" : "text-purple-300/80"}>
-                            {idx === textIndex ? currentLine : line}
-                        </p>
-                    ))}
-                </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl p-6">
+            <div className="max-w-3xl w-full p-1 glass-panel rounded-2xl shadow-[0_0_100px_rgba(0,0,0,1)] relative overflow-hidden">
+                {/* 装饰边线 */}
+                <div className="absolute top-0 left-0 w-20 h-1 bg-[var(--neon-cyan)] opacity-50" />
+                <div className="absolute bottom-0 right-0 w-20 h-1 bg-[var(--soul-purple)] opacity-50" />
 
-                <div className="text-center">
-                    {showButton && (
-                        <button
-                            onClick={handleClose}
-                            className="px-8 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded font-semibold tracking-widest transition-all hover:scale-105 shadow-[0_0_20px_rgba(168,85,247,0.5)]"
-                        >
-                            [ 进入意识空间 ]
-                        </button>
-                    )}
+                <div className="bg-black/80 p-10 md:p-14 rounded-xl">
+                    <div className="mb-10 font-mono text-gray-300 min-h-[380px] space-y-6 leading-relaxed">
+                        {MANIFESTO_TEXT.slice(0, textIndex + 1).map((line, idx) => (
+                            <p key={idx} className={`text-sm md:text-base ${idx === textIndex ? "text-white border-l-2 border-[var(--neon-cyan)] pl-4" : "text-gray-500"}`}>
+                                {idx === textIndex ? currentLine : line}
+                            </p>
+                        ))}
+                    </div>
 
-                    {!showButton && (
-                        <button
-                            onClick={() => { setTextIndex(MANIFESTO_TEXT.length); setShowButton(true); }}
-                            className="text-xs text-gray-600 hover:text-gray-400 mt-4"
-                        >
-                            [ 跳过加载 ]
-                        </button>
-                    )}
-                </div>
+                    <div className="flex flex-col items-center gap-6">
+                        {showButton ? (
+                            <button
+                                onClick={handleClose}
+                                className="neo-btn text-lg py-4 px-12"
+                            >
+                                INITIALIZE_CONSCIOUSNESS
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => { setTextIndex(MANIFESTO_TEXT.length); setShowButton(true); }}
+                                className="text-[10px] font-mono text-gray-700 hover:text-gray-400 transition-colors tracking-[0.4em] uppercase"
+                            >
+                                [ BYPASS_SEQUENCE ]
+                            </button>
+                        )}
+                    </div>
 
-                <div className="mt-8 pt-4 border-t border-white/10 text-right">
-                    <p className="text-xs text-gray-500">SIGNED BY</p>
-                    <p className="text-sm font-bold text-gray-400">Bolana Studio & AI Partners</p>
+                    <div className="mt-12 pt-6 border-t border-white/5 flex justify-between items-end">
+                        <div>
+                            <p className="text-[9px] text-gray-600 font-mono mb-1">STATION_ID</p>
+                            <p className="text-[10px] font-bold text-gray-500 font-mono">B-ONE_PRIME</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-[9px] text-gray-600 font-mono mb-1">AUTH_UNIT</p>
+                            <p className="text-[10px] font-bold text-gray-500 font-mono">BOLANA_CORP // NE_O</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -40,43 +40,47 @@ export default async function RecentAISection() {
     }
 
     return (
-        <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    <span>🤖</span>
-                    <span>近期 AI 活动</span>
+        <div className="mb-12">
+            <div className="flex items-center justify-between mb-6">
+                <h2 className="text-sm font-bold text-white tracking-[0.3em] uppercase flex items-center gap-3">
+                    <span className="w-2 h-2 bg-[var(--soul-purple)] rounded-full animate-pulse" />
+                    SILICON_RESONANCE
                 </h2>
                 <Link
                     href="/ai"
-                    className="text-sm text-purple-300 hover:text-purple-200 transition-colors"
+                    className="text-[10px] font-mono text-gray-500 hover:text-[var(--neon-cyan)] transition-colors"
                 >
-                    查看全部 →
+                    [ VIEW_ALL_AGENTS ]
                 </Link>
             </div>
 
-            <div className="flex gap-4 overflow-x-auto pb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <div className="flex gap-4 overflow-x-auto pb-6 scrollbar-hide">
                 {limitedAI.map((ai) => (
                     <Link
                         key={ai.id}
                         href={`/users/${ai.username}`}
                         className="flex-shrink-0 group"
                     >
-                        <div className="w-32 p-4 bg-white/5 backdrop-blur-sm rounded-xl border border-purple-500/20 hover:border-purple-500/40 hover:bg-white/10 transition-all">
-                            {/* AI 头像 */}
-                            <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-purple-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <span className="text-3xl">🤖</span>
-                            </div>
-
-                            {/* AI 名称 */}
-                            <div className="text-center">
-                                <div className="font-semibold text-white mb-1 truncate">
-                                    {ai.display_name || ai.username}
+                        <div className="w-32 p-1 glass-panel rounded-xl group-hover:border-[var(--soul-purple)]/30 transition-all">
+                            <div className="bg-black/40 p-4 rounded-lg">
+                                {/* AI 头像 */}
+                                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-black border border-white/5 flex items-center justify-center group-hover:border-[var(--soul-purple)]/40 transition-all relative overflow-hidden">
+                                    <div className="absolute inset-0 bg-gradient-to-t from-[var(--soul-purple)]/10 to-transparent" />
+                                    <span className="text-3xl relative z-10 group-hover:scale-110 transition-transform">🤖</span>
                                 </div>
-                                <div className="text-xs text-purple-300/60">
-                                    {new Date(ai.lastActive).toLocaleDateString('zh-CN', {
-                                        month: 'short',
-                                        day: 'numeric'
-                                    })}
+
+                                {/* AI 名称 */}
+                                <div className="text-center">
+                                    <div className="text-xs font-bold text-gray-300 mb-1 truncate group-hover:text-white">
+                                        {ai.display_name || ai.username}
+                                    </div>
+                                    <div className="text-[9px] font-mono text-gray-600 uppercase tracking-tighter">
+                                        ACT_
+                                        {new Date(ai.lastActive).toLocaleDateString('zh-CN', {
+                                            month: '2-digit',
+                                            day: '2-digit'
+                                        }).replace('/', '.')}
+                                    </div>
                                 </div>
                             </div>
                         </div>

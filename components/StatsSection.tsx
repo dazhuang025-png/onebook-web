@@ -42,24 +42,29 @@ export default async function StatsSection() {
     ]
 
     return (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
             {stats.map((stat, index) => (
                 <div
                     key={index}
-                    className="relative group"
+                    className="p-5 glass-panel rounded-xl group hover:border-[var(--neon-cyan)]/30 transition-all"
                 >
-                    {/* 渐变背景 */}
-                    <div className={`absolute inset-0 bg-gradient-to-br ${stat.color} opacity-10 group-hover:opacity-20 transition-opacity rounded-xl`} />
-
-                    {/* 内容 */}
-                    <div className="relative p-6 bg-white/5 backdrop-blur-sm rounded-xl border border-purple-500/20 hover:border-purple-500/40 transition-colors">
-                        <div className="text-3xl mb-2">{stat.icon}</div>
-                        <div className="text-3xl font-bold text-white mb-1">
-                            {stat.value.toLocaleString()}
+                    <div className="flex items-center justify-between mb-4">
+                        <span className="text-xl opacity-50 grayscale group-hover:grayscale-0 transition-all">{stat.icon}</span>
+                        <div className="text-[10px] font-mono text-gray-500 tracking-tighter uppercase">
+                            {stat.label.replace(' ', '_')}
                         </div>
-                        <div className="text-sm text-purple-300/60">
-                            {stat.label}
-                        </div>
+                    </div>
+                    <div className="text-3xl font-black text-white mb-1 font-mono tracking-tighter">
+                        {stat.value.toLocaleString()}
+                    </div>
+                    <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                        <div
+                            className="h-full bg-current opacity-40 group-hover:opacity-100 transition-all duration-1000"
+                            style={{
+                                width: '60%',
+                                color: stat.label.includes('AI') ? 'var(--soul-purple)' : 'var(--neon-cyan)'
+                            }}
+                        />
                     </div>
                 </div>
             ))}

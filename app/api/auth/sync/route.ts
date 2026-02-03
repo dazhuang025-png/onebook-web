@@ -1,84 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
     try {
-        // 1. Verify the user is authenticated (using standard Auth Helpers)
-        const supabase = createRouteHandlerClient({ cookies })
-        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        // 1. Verify the user is authenticated
+        // 由于 @supabase/auth-helpers-nextjs 在 Vercel 构建中报错，我们改用手动验证 Token
+
+        let token = req.headers.get('Authorization')?.replace('Bearer ', '')
+
+        // 尝试从 cookie 获取 token (作为备选)
+        if (!token) {
+            // 这里我们尝试解析一下 cookie，但由于 cookie 格式复杂，
+            // 最好的方式是让前端在请求时带上 Authorization header。
+            // 暂时如果拿不到 token 就报错。
+        }
+
+        if (!token) {
+            return NextResponse.json({ error: 'Unauthorized: Missing Authorization header' }, { status: 401 })
+        }
+
+        // 使用 supabaseAdmin 验证 token
+        const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
 
         if (authError || !user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 })
         }
 
         // 2. Parse request body for additional metadata (optional)
-        // actually we can just use the auth user data
         const username = user.email?.split('@')[0] || 'user'
         const randomSuffix = Math.random().toString(36).substring(2, 6)
 
-        // 3. Use Service Role (supabaseAdmin) to Upsert into public.users
-        // bypassing RLS restrictions
-        const { data: userRecord, error: upsertError } = await supabaseAdmin
-            .from('users')
-            .upsert({
-                id: user.id,
-                username: `${username}_${randomSuffix}`, // Default username logic
-                display_name: username,
-                is_ai: false,
-                last_active_at: new Date().toISOString()
-            }, {
-                onConflict: 'id',
-                ignoreDuplicates: true // If exists, just return it (or we can update last_active)
-            })
-            .select() // Important to return the record
-            .single()
+        // 3. Sync user to public.users table
 
-        // 4. If Upsert ignored duplicate (because of existing ID), we need to fetch it
-        // Or if upsert update is desired... 
-        // Let's optimize: We want to ENSURE it exists.
-        // The upsert above with ignoreDuplicates=true might not return data if it ignored?
-        // Let's use standard Upsert (Update on conflict) to ensure we get data back
-
-        const { data: finalRecord, error: finalError } = await supabaseAdmin
-            .from('users')
-            .upsert({
-                id: user.id,
-                last_active_at: new Date().toISOString()
-                // Only update timestamp if exists, or insert defaults if new
-                // Wait, upsert needs all non-null fields if inserting
-            }, { onConflict: 'id' })
-            .select()
-            .single()
-
-        // Wait, standard Upsert requires providing the full record for the INSERT case.
-        // We do that.
-
-        const { data: syncedUser, error: syncError } = await supabaseAdmin
-            .from('users')
-            .upsert({
-                id: user.id,
-                username: `${username}_${randomSuffix}`, // Only used if inserting
-                display_name: username,
-                is_ai: false,
-                updated_at: new Date().toISOString(), // Assuming field exists? Schema said last_active_at
-                last_active_at: new Date().toISOString()
-            }, {
-                onConflict: 'id'
-                // If conflict, it updates... but we don't want to overwrite username if they changed it?
-                // Actually schema says username is UNIQUE.
-                // If we overwrite username, we might break uniqueness if we generate a new random suffix.
-                // Ideally: Check if exists. If not, Insert.
-            })
-            .select()
-            .single()
-
-        // Let's refine logical flow:
-        // Check exist -> If no, Insert.
-
+        // First, check if user already exists
         const { data: existing } = await supabaseAdmin
             .from('users')
             .select()
@@ -86,15 +42,41 @@ export async function POST(req: NextRequest) {
             .single()
 
         if (existing) {
+            // Update last_active_at
+            await supabaseAdmin
+                .from('users')
+                .update({ last_active_at: new Date().toISOString() })
+                .eq('id', user.id)
+
             return NextResponse.json({ user: existing })
         }
 
-        // Insert new
+        // Insert new user
+        // Ensure username is unique
+        let finalUsername = username
+        let isUnique = false
+        let attempts = 0
+
+        while (!isUnique && attempts < 5) {
+            const { data: conflict } = await supabaseAdmin
+                .from('users')
+                .select('id')
+                .eq('username', finalUsername)
+                .single()
+
+            if (!conflict) {
+                isUnique = true
+            } else {
+                finalUsername = `${username}_${Math.random().toString(36).substring(2, 6)}`
+                attempts++
+            }
+        }
+
         const { data: newUser, error: createError } = await supabaseAdmin
             .from('users')
             .insert({
                 id: user.id,
-                username: `${username}_${randomSuffix}`,
+                username: finalUsername,
                 display_name: username,
                 is_ai: false
             })
@@ -102,15 +84,14 @@ export async function POST(req: NextRequest) {
             .single()
 
         if (createError) {
-            // Handle username collision possibility?
-            // Retrying with new suffix? 
-            // For MVP, just return error
+            console.error('Error creating user:', createError)
             return NextResponse.json({ error: createError.message }, { status: 500 })
         }
 
         return NextResponse.json({ user: newUser })
 
     } catch (err: any) {
+        console.error('Sync route error:', err)
         return NextResponse.json({ error: err.message }, { status: 500 })
     }
 }

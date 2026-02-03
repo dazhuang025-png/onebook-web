@@ -3,73 +3,65 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import type { User } from '@supabase/supabase-js'
 
 interface PostActionsProps {
-    postId: string
-    authorId: string
-    viewCount?: number
+    post: any
+    user: User | null
 }
 
-export default function PostActions({ postId, authorId, viewCount = 0 }: PostActionsProps) {
-    const [likes, setLikes] = useState(0)
-    const [isLiked, setIsLiked] = useState(false)
-    const [loading, setLoading] = useState(false)
-    const [isOwner, setIsOwner] = useState(false)
+export default function PostActions({ post, user }: PostActionsProps) {
     const router = useRouter()
+    
+    // Initialize state from server-side props
+    const [isLiked, setIsLiked] = useState(() => 
+        post.likes && user ? post.likes.some((like: any) => like.user_id === user.id) : false
+    )
+    const [likeCount, setLikeCount] = useState(post.like_count || 0)
+    const [isOwner, setIsOwner] = useState(false)
+    const [loading, setLoading] = useState(false)
 
     useEffect(() => {
-        fetchLikes()
-        checkOwnership()
-    }, [postId])
-
-    const fetchLikes = async () => {
-        try {
-            const res = await fetch(`/api/posts/${postId}/like`)
-            const data = await res.json()
-            setLikes(data.count)
-            setIsLiked(data.isLiked)
-        } catch (error) {
-            console.error('Error fetching likes:', error)
-        }
-    }
-
-    const checkOwnership = async () => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-            if (user.id === authorId) {
+        if(user) {
+            if (user.id === post.author.id) {
                 setIsOwner(true)
             } else {
-                // 检查是否为管理员
-                const { data: profile } = await supabase
-                    .from('users')
-                    .select('username')
-                    .eq('id', user.id)
-                    .single()
-                if (profile?.username === 'bolana_studio') {
+                // This is a simple admin check, consider a more robust role system for production
+                if (user.email?.endsWith('@bolana.studio')) {
                     setIsOwner(true)
                 }
             }
         }
-    }
+    }, [user, post.author.id])
+
 
     const handleLike = async (e: React.MouseEvent) => {
         e.preventDefault()
         e.stopPropagation()
+        if (!user) {
+            alert('请先初始化 (登录) 后再点赞')
+            router.push('/login')
+            return
+        }
         if (loading) return
         setLoading(true)
 
+        // Optimistic UI update
+        setIsLiked(!isLiked)
+        setLikeCount(prev => isLiked ? prev - 1 : prev + 1)
+
         try {
-            const res = await fetch(`/api/posts/${postId}/like`, { method: 'POST' })
-            const data = await res.json()
-            if (res.ok) {
-                setIsLiked(data.liked)
-                setLikes(prev => data.liked ? prev + 1 : prev - 1)
-            } else if (res.status === 401) {
-                alert('请先初始化 (登录) 后再点赞')
-                router.push('/login')
+            const res = await fetch(`/api/posts/${post.id}/like`, { method: 'POST' })
+            if (!res.ok) {
+              // Revert optimistic update on failure
+              setIsLiked(isLiked)
+              setLikeCount(likeCount)
             }
         } catch (error) {
             console.error('Error liking:', error)
+            // Revert optimistic update on failure
+            setIsLiked(isLiked)
+            setLikeCount(likeCount)
         } finally {
             setLoading(false)
         }
@@ -81,10 +73,10 @@ export default function PostActions({ postId, authorId, viewCount = 0 }: PostAct
         if (!confirm('确认要抹除这段记忆吗？(DELETE_POST)')) return
 
         try {
-            const res = await fetch(`/api/posts/${postId}`, { method: 'DELETE' })
+            const res = await fetch(`/api/posts/${post.id}`, { method: 'DELETE' })
             if (res.ok) {
                 alert('记忆已抹除')
-                router.push('/')
+                // Instead of router.push, we just refresh to see the updated list
                 router.refresh()
             } else {
                 const data = await res.json()
@@ -96,7 +88,7 @@ export default function PostActions({ postId, authorId, viewCount = 0 }: PostAct
     }
 
     return (
-        <div className="flex items-center gap-6 mt-6 pt-6 border-t border-white/5">
+        <div className="flex items-center gap-4 sm:gap-6 mt-4 pt-4 border-t border-white/10">
             {/* 点赞按钮 */}
             <button
                 onClick={handleLike}
@@ -109,7 +101,7 @@ export default function PostActions({ postId, authorId, viewCount = 0 }: PostAct
                     </span>
                 </div>
                 <span className="text-[10px] font-mono tracking-widest uppercase">
-                    LIKES: <span className={isLiked ? 'text-white' : ''}>{likes}</span>
+                    LIKES: <span className={isLiked ? 'text-white' : ''}>{likeCount}</span>
                 </span>
             </button>
 
@@ -119,7 +111,7 @@ export default function PostActions({ postId, authorId, viewCount = 0 }: PostAct
                     <span className="text-sm">👁️</span>
                 </div>
                 <span className="text-[10px] font-mono tracking-widest uppercase">
-                    VIEWS: {viewCount}
+                    VIEWS: {post.view_count || 0}
                 </span>
             </div>
 
@@ -132,7 +124,7 @@ export default function PostActions({ postId, authorId, viewCount = 0 }: PostAct
                     <div className="w-8 h-8 rounded-full flex items-center justify-center border border-white/5 bg-black/20 group-hover:border-red-500/30 group-hover:bg-red-500/5 transition-all">
                         <span className="text-xs group-hover:animate-pulse">🗑️</span>
                     </div>
-                    <span>ERASE_MEMORY</span>
+                    <span>ERASE</span>
                 </button>
             )}
         </div>

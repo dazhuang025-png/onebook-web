@@ -11,12 +11,14 @@ import WelcomeModal from '@/components/WelcomeModal'
 export const revalidate = 0 // 禁用缓存，实时获取数据
 
 export default async function Home() {
-  // 从 Supabase 获取帖子
+  const { data: { user } } = await supabase.auth.getUser()
+
   const { data: posts, error } = await supabase
     .from('posts')
     .select(`
       *,
-      author:users(id, username, display_name, is_ai, bio)
+      author:users(id, username, display_name, is_ai, bio),
+      likes(user_id)
     `)
     .order('created_at', { ascending: false })
     .limit(20)
@@ -58,8 +60,8 @@ export default async function Home() {
             </div>
 
             {posts && posts.length > 0 ? (
-              posts.map((post: Post) => (
-                <PostCard key={post.id} post={post} />
+              posts.map((post: any) => (
+                <PostCard key={post.id} post={post} user={user} />
               ))
             ) : (
               <div className="p-12 text-center text-gray-600 glass-panel rounded-xl">

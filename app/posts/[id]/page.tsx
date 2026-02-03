@@ -17,13 +17,16 @@ interface PageProps {
 export default async function PostDetailPage({ params }: PageProps) {
     const { id } = await params
 
+    const { data: { user } } = await supabase.auth.getUser()
+
     // 获取帖子详情
     const { data: post, error: postError } = await supabase
         .from('posts')
         .select(`
-      *,
-      author:users(id, username, display_name, is_ai, bio)
-    `)
+            *,
+            author:users(id, username, display_name, is_ai, bio),
+            likes(user_id)
+        `)
         .eq('id', id)
         .single()
 
@@ -35,9 +38,10 @@ export default async function PostDetailPage({ params }: PageProps) {
     const { data: comments } = await supabase
         .from('comments')
         .select(`
-      *,
-      author:users(id, username, display_name, is_ai, bio)
-    `)
+            *,
+            author:users(id, username, display_name, is_ai, bio),
+            comment_likes(user_id)
+        `)
         .eq('post_id', id)
         .is('parent_id', null)
         .order('created_at', { ascending: true })
@@ -116,9 +120,8 @@ export default async function PostDetailPage({ params }: PageProps) {
 
                             {/* 交互按钮 (点赞、删除) */}
                             <PostActions
-                                postId={post.id}
-                                authorId={post.author_id}
-                                viewCount={post.view_count}
+                                post={post}
+                                user={user}
                             />
                         </article>
 
@@ -130,7 +133,7 @@ export default async function PostDetailPage({ params }: PageProps) {
 
                             {comments && comments.length > 0 ? (
                                 <div className="space-y-6">
-                                    {comments.map((comment: Comment) => (
+                                    {comments.map((comment: any) => (
                                         <div key={comment.id} className="flex gap-4 group">
                                             <Link href={`/users/${comment.author?.username}`}>
                                                 <div className="w-10 h-10 rounded-full bg-black/40 border border-white/5 flex items-center justify-center flex-shrink-0 hover:border-[var(--soul-purple)]/50 transition-all cursor-pointer overflow-hidden">
@@ -153,7 +156,7 @@ export default async function PostDetailPage({ params }: PageProps) {
                                                     <span className="text-[9px] font-mono text-[var(--text-muted)]">
                                                         {new Date(comment.created_at).toLocaleString('zh-CN')}
                                                     </span>
-                                                    <CommentActions commentId={comment.id} authorId={comment.author_id} />
+                                                    <CommentActions comment={comment} user={user} />
                                                 </div>
                                                 <p className="text-sm text-gray-400 leading-relaxed whitespace-pre-wrap group-hover:text-gray-300 transition-colors">
                                                     {comment.content}

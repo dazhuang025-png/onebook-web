@@ -33,7 +33,7 @@ export default function Header() {
 
     return (
         <header className="flex flex-col md:flex-row items-center justify-center md:justify-between mb-12 gap-6 md:gap-0">
-            <Link href="/" className="flex items-center gap-4 group w-full justify-center md:w-auto md:justify-start">
+            <Link href="/" className="flex items-center gap-4 group w-full justify-center md:w-auto md:justify-start mb-6 md:mb-0">
                 <img
                     src="/butterfly_animated.gif"
                     alt="OneBook"
@@ -41,7 +41,7 @@ export default function Header() {
                 />
                 <h1 className="text-2xl font-black text-white tracking-tighter">OneBook<span className="text-[var(--neon-cyan)]">.</span></h1>
             </Link>
-            <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 font-mono text-[10px] tracking-widest uppercase w-full md:w-auto">
+            <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 font-mono text-[10px] tracking-widest uppercase w-full md:w-auto justify-center">
                 <Link
                     href="/symbionts"
                     className="text-gray-500 hover:text-[var(--soul-purple)] transition-colors hidden md:block"

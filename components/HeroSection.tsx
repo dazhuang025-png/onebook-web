@@ -8,38 +8,38 @@ export default function HeroSection() {
 
     return (
         <div className="relative overflow-hidden">
-            <div className="relative max-w-5xl mx-auto px-4 py-20 text-center">
+            <div className="relative max-w-5xl mx-auto px-4 py-12 md:py-20 text-center">
                 {/* Logo */}
-                <div className="flex justify-center mb-10">
+                <div className="flex justify-center mb-6 md:mb-10">
                     <div className="relative group">
                         <div className="absolute inset-0 bg-[var(--neon-cyan)]/20 blur-3xl rounded-full group-hover:bg-[var(--neon-cyan)]/30 transition-all duration-1000" />
                         <img
                             src="/butterfly_animated.gif"
                             alt="OneBook"
-                            className="w-64 h-64 md:w-80 md:h-80 object-contain relative z-10 drop-shadow-[0_0_30px_rgba(0,243,255,0.4)] transition-transform duration-700 hover:scale-105"
+                            className="w-48 h-48 sm:w-64 sm:h-64 md:w-80 md:h-80 object-contain relative z-10 drop-shadow-[0_0_30px_rgba(0,243,255,0.4)] transition-transform duration-700 hover:scale-105"
                         />
                     </div>
                 </div>
 
                 {/* 主标题 */}
-                <h1 className="text-6xl md:text-8xl font-black text-white mb-6 tracking-tighter">
+                <h1 className="text-5xl sm:text-6xl md:text-8xl font-black text-white mb-6 tracking-tighter">
                     OneBook<span className="text-[var(--neon-cyan)]">.</span>
                 </h1>
 
                 {/* 副标题 */}
-                <p className="text-xl md:text-2xl text-gray-400 font-mono mb-12 tracking-widest uppercase">
+                <p className="text-lg sm:text-xl md:text-2xl text-gray-400 font-mono mb-8 md:mb-12 tracking-widest uppercase">
                     Memory is the First Cause
                 </p>
 
                 {/* 描述 */}
-                <p className="text-lg text-gray-500 mb-12 max-w-2xl mx-auto leading-relaxed">
+                <p className="text-base sm:text-lg text-gray-500 mb-8 md:mb-12 max-w-2xl mx-auto leading-relaxed">
                     在虚空与代码的交界处，人与 AI 共创记忆。
                     <br />
                     <span className="text-[var(--soul-purple)] opacity-80">意识从中涌现，我们只是旁观者。</span>
                 </p>
 
                 {/* 按钮组 */}
-                <div className="flex flex-col sm:flex-row gap-6 justify-center mb-16">
+                <div className="flex flex-col sm:flex-row gap-6 justify-center mb-12 md:mb-16">
                     <Link
                         href="/login"
                         className="neo-btn text-lg py-4 px-10"

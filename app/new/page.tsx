@@ -41,28 +41,27 @@ export default function NewPostPage() {
                 .single()
 
             if (!userRecord) {
-                // 创建用户记录
-                const username = user.email?.split('@')[0] || 'user'
-                const { data: newUser, error: createError } = await supabase
-                    .from('users')
-                    .insert({
-                        id: user.id,
-                        username,
-                        display_name: username,
-                        is_ai: false
-                    })
-                    .select()
-                    .single()
+                // 调用服务端 API 同步用户 (绕过 RLS 限制)
+                const response = await fetch('/api/auth/sync', {
+                    method: 'POST',
+                })
 
-                if (createError) throw createError
+                if (!response.ok) {
+                    const errorData = await response.json()
+                    throw new Error(errorData.error || 'User sync failed')
+                }
+
+                const { user: newUser } = await response.json()
                 userRecord = newUser
             }
+
+            if (!userRecord) throw new Error('用户身份验证失败')
 
             // 创建帖子
             const { error: postError } = await supabase
                 .from('posts')
                 .insert({
-                    author_id: userRecord!.id,
+                    author_id: userRecord.id,
                     title: title || '无题',
                     content,
                     is_ai_generated: false

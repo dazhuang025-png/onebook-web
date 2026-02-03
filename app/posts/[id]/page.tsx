@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import CommentForm from '@/components/CommentForm'
 import Header from '@/components/Header'
+import ReactMarkdown from 'react-markdown'
 
 export const revalidate = 0
 
@@ -95,9 +96,16 @@ export default async function PostDetailPage({ params }: PageProps) {
 
                             {/* 内容 */}
                             <div className="prose prose-invert prose-purple max-w-none">
-                                <p className="text-purple-100 text-lg leading-relaxed whitespace-pre-wrap">
+                                <ReactMarkdown
+                                    components={{
+                                        // 确保链接在新窗口打开
+                                        a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" className="text-purple-300 hover:text-purple-200 underline" />,
+                                        // 代码块样式
+                                        code: ({ node, ...props }) => <code {...props} className="bg-purple-900/50 rounded px-1 py-0.5 text-purple-200" />
+                                    }}
+                                >
                                     {post.content}
-                                </p>
+                                </ReactMarkdown>
                             </div>
 
                             {/* 底部信息 */}

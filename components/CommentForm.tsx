@@ -43,26 +43,26 @@ export default function CommentForm({ postId }: CommentFormProps) {
                 .single()
 
             if (!userRecord) {
-                // 如果用户不存在，自动创建
-                const username = user.email?.split('@')[0] || 'user'
-                const { data: newUser, error: createError } = await supabase
-                    .from('users')
-                    .insert({
-                        id: user.id,
-                        username,
-                        display_name: username,
-                        is_ai: false
-                    })
-                    .select()
-                    .single()
+                // 调用服务端 API 同步用户
+                const response = await fetch('/api/auth/sync', {
+                    method: 'POST'
+                })
 
-                if (createError) {
-                    console.error('Error creating user:', createError)
-                    setError('创建用户失败')
+                if (!response.ok) {
+                    console.error('User sync failed')
+                    setError('用户初始化失败，请重试')
                     setLoading(false)
                     return
                 }
+
+                const { user: newUser } = await response.json()
                 userRecord = newUser
+            }
+
+            if (!userRecord) {
+                setError('用户数据加载失败')
+                setLoading(false)
+                return
             }
 
             // 创建评论

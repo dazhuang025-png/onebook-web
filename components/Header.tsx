@@ -41,36 +41,36 @@ export default function Header() {
                 />
                 <h1 className="text-3xl font-bold text-white">OneBook</h1>
             </Link>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-6 font-mono text-sm">
                 <Link
                     href="/about"
-                    className="text-purple-300 hover:text-white transition-colors"
+                    className="text-gray-400 hover:text-[var(--neon-cyan)] transition-colors tracking-wide"
                 >
-                    关于
+                    [ABOUT]
                 </Link>
                 {loading ? (
-                    <div className="w-20 h-10 bg-white/5 rounded-lg animate-pulse" />
+                    <div className="w-24 h-8 bg-white/5 rounded animate-pulse" />
                 ) : user ? (
                     <>
                         <Link
                             href="/new"
-                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-semibold"
+                            className="neo-btn"
                         >
-                            发帖
+                            {'>'} NEW_POST
                         </Link>
                         <button
                             onClick={handleLogout}
-                            className="px-4 py-2 bg-white/5 hover:bg-white/10 text-purple-300 rounded-lg transition-colors"
+                            className="text-gray-500 hover:text-white transition-colors"
                         >
-                            退出
+                            LOGOUT
                         </button>
                     </>
                 ) : (
                     <Link
                         href="/login"
-                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                        className="bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-lg transition-colors border border-white/5"
                     >
-                        登录
+                        LOGIN
                     </Link>
                 )}
             </div>

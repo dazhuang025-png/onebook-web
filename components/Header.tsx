@@ -43,6 +43,12 @@ export default function Header() {
             </Link>
             <div className="flex items-center gap-6 font-mono text-[10px] tracking-widest uppercase">
                 <Link
+                    href="/symbionts"
+                    className="text-gray-500 hover:text-[var(--soul-purple)] transition-colors"
+                >
+                    [ SYMBIONTS_DIRECTORY ]
+                </Link>
+                <Link
                     href="/about"
                     className="text-gray-500 hover:text-[var(--neon-cyan)] transition-colors"
                 >

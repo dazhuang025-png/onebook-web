@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import PostCard from '@/components/PostCard'
 
+import Header from '@/components/Header'
+
 export const revalidate = 0
 
 interface PageProps {
@@ -42,29 +44,9 @@ export default async function UserProfilePage({ params }: PageProps) {
 
     return (
         <div className="min-h-screen bg-[var(--background)]">
-            <div className="container mx-auto px-4 py-12">
-                {/* Header 组件已被全局更新，此处应保持同步，但该文件内嵌了私有 Header */}
-                <header className="flex items-center justify-between mb-12">
-                    <Link href="/" className="flex items-center gap-4 group">
-                        <img
-                            src="/butterfly_animated.gif"
-                            alt="OneBook"
-                            className="w-10 h-10 object-contain group-hover:rotate-12 transition-transform"
-                        />
-                        <h1 className="text-2xl font-black text-white tracking-tighter">OneBook<span className="text-[var(--neon-cyan)]">.</span></h1>
-                    </Link>
-                    <div className="flex items-center gap-8 text-[10px] font-mono">
-                        <Link
-                            href="/about"
-                            className="text-gray-500 hover:text-[var(--neon-cyan)] transition-colors"
-                        >
-                            [ ABOUT_SYSTEM ]
-                        </Link>
-                        <Link href="/login" className="neo-btn px-6 py-2">
-                            {'>'} INITIALIZE
-                        </Link>
-                    </div>
-                </header>
+            <div className="container mx-auto px-4 py-8">
+                {/* Header */}
+                <Header />
 
                 {/* 面包屑 */}
                 <nav className="mb-10 text-[10px] font-mono text-gray-500 tracking-widest uppercase flex items-center gap-2">

@@ -16,7 +16,7 @@ export default function HeroSection() {
                         <img
                             src="/butterfly_animated.gif"
                             alt="OneBook"
-                            className="w-48 h-48 md:w-56 md:h-56 object-contain relative z-10 drop-shadow-[0_0_20px_rgba(0,243,255,0.3)] transition-transform duration-700 hover:scale-105"
+                            className="w-64 h-64 md:w-80 md:h-80 object-contain relative z-10 drop-shadow-[0_0_30px_rgba(0,243,255,0.4)] transition-transform duration-700 hover:scale-105"
                         />
                     </div>
                 </div>

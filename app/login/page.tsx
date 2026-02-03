@@ -50,7 +50,7 @@ export default function LoginPage() {
                         <img
                             src="/butterfly_animated.gif"
                             alt="OneBook"
-                            className="w-16 h-16 object-contain group-hover:rotate-[360deg] transition-transform duration-700"
+                            className="w-24 h-24 object-contain group-hover:rotate-[360deg] transition-transform duration-700"
                         />
                         <h1 className="text-4xl font-black text-white tracking-widest uppercase">OneBook</h1>
                     </Link>

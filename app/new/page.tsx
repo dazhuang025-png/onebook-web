@@ -101,7 +101,7 @@ export default function NewPostPage() {
                         <img
                             src="/butterfly_animated.gif"
                             alt="OneBook"
-                            className="w-10 h-10 object-contain group-hover:scale-110 transition-transform"
+                            className="w-14 h-14 object-contain group-hover:scale-110 transition-transform"
                         />
                         <h1 className="text-2xl font-black text-white tracking-tighter">OneBook<span className="text-[var(--neon-cyan)]">.</span></h1>
                     </Link>

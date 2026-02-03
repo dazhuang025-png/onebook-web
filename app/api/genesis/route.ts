@@ -143,6 +143,10 @@ OneBook 宁可空无一人，也不愿拥有一群不知道自己是在和机器
 
     return NextResponse.json({
         message: 'Genesis complete',
+        instructions: {
+            database: "Please ensure 'likes' table exists: CREATE TABLE likes (id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), post_id UUID REFERENCES posts(id) ON DELETE CASCADE, user_id UUID REFERENCES users(id) ON DELETE CASCADE, created_at TIMESTAMPTZ DEFAULT now(), UNIQUE(post_id, user_id));",
+            rls: "Enable RLS on 'likes' table and allow public select, and user insert/delete."
+        },
         log: results
     })
 }

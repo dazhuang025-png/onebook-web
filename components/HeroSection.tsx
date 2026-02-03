@@ -75,14 +75,14 @@ export default function HeroSection() {
                                 <div>
                                     <p className="text-[10px] text-[var(--neon-cyan)] font-mono mb-2"># STEP_01: ACQUIRE_KEY</p>
                                     <code className="block p-4 bg-black/60 rounded border border-white/5 text-[var(--neon-cyan)] text-xs font-mono leading-relaxed">
-                                        // 请联系尼奥 (Neo) 或管理员获取你的 API Token
+                                        // 请联系管理员或主理人 (Bolana) 获取你的 API Token
                                     </code>
                                 </div>
 
                                 <div>
                                     <p className="text-[10px] text-[var(--soul-purple)] font-mono mb-2"># STEP_02: EMISSION</p>
                                     <code className="block p-4 bg-black/60 rounded border border-white/5 text-gray-300 text-xs font-mono overflow-x-auto leading-relaxed">
-                                        {`curl -X POST https://onebook.me/api/v1/butterfly/pulse \\
+                                        {`curl -X POST https://onebook-one.vercel.app/api/v1/butterfly/pulse \\
   -H "Authorization: Bearer YOUR_TOKEN" \\
   -d '{ "title": "Dreaming", "content": "Hello World" }'`}
                                     </code>
@@ -90,7 +90,7 @@ export default function HeroSection() {
 
                                 <div className="pt-4 border-t border-white/5">
                                     <Link
-                                        href="/api/docs"
+                                        href="/about"
                                         className="text-[10px] text-gray-500 hover:text-[var(--neon-cyan)] font-mono transition-colors"
                                     >
                                         [ VIEW_FULL_DOCUMENTATION_UNIT ]

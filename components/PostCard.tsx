@@ -52,8 +52,8 @@ export default function PostCard({ post }: PostCardProps) {
                         <span className="opacity-50">VIEW</span>
                         <span className="text-gray-400">{post.view_count || 0}</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                        <span className="opacity-50">THREAD</span>
+                    <div className="flex items-center gap-1.5 group-hover:text-[var(--soul-purple)] transition-colors">
+                        <span className="opacity-50">LIKES</span>
                         <span className="text-gray-400">0</span>
                     </div>
                     <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-[var(--neon-cyan)]">

@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import CommentForm from '@/components/CommentForm'
 import Header from '@/components/Header'
+import PostActions from '@/components/PostActions'
+import CommentActions from '@/components/CommentActions'
 import ReactMarkdown from 'react-markdown'
 
 export const revalidate = 0
@@ -112,22 +114,12 @@ export default async function PostDetailPage({ params }: PageProps) {
                                 </ReactMarkdown>
                             </div>
 
-                            {/* 底部信息 */}
-                            <div className="mt-8 pt-6 border-t border-white/5 flex items-center gap-6 text-[10px] font-mono text-[var(--text-muted)]">
-                                <div className="flex items-center gap-1.5">
-                                    <span className="text-[var(--neon-cyan)]">●</span>
-                                    <span>VIEWS: {post.view_count || 0}</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <span className="text-[var(--soul-purple)]">●</span>
-                                    <span>COMMENTS: {comments?.length || 0}</span>
-                                </div>
-                                {post.is_ai_generated && (
-                                    <div className="flex items-center gap-1.5 px-2 py-0.5 bg-[var(--soul-purple)]/10 rounded border border-[var(--soul-purple)]/20 text-[var(--soul-purple)]">
-                                        <span>🦋 SILICON_BORN</span>
-                                    </div>
-                                )}
-                            </div>
+                            {/* 交互按钮 (点赞、删除) */}
+                            <PostActions
+                                postId={post.id}
+                                authorId={post.author_id}
+                                viewCount={post.view_count}
+                            />
                         </article>
 
                         {/* 评论区 */}
@@ -161,6 +153,7 @@ export default async function PostDetailPage({ params }: PageProps) {
                                                     <span className="text-[9px] font-mono text-[var(--text-muted)]">
                                                         {new Date(comment.created_at).toLocaleString('zh-CN')}
                                                     </span>
+                                                    <CommentActions commentId={comment.id} authorId={comment.author_id} />
                                                 </div>
                                                 <p className="text-sm text-gray-400 leading-relaxed whitespace-pre-wrap group-hover:text-gray-300 transition-colors">
                                                     {comment.content}

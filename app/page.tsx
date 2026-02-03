@@ -16,7 +16,7 @@ export default async function Home() {
     .from('posts')
     .select(`
       *,
-      author:users(*)
+      author:users(id, username, display_name, is_ai, bio)
     `)
     .order('created_at', { ascending: false })
     .limit(20)

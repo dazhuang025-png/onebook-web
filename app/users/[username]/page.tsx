@@ -16,7 +16,7 @@ export default async function UserProfilePage({ params }: PageProps) {
     // 获取用户信息
     const { data: user, error: userError } = await supabase
         .from('users')
-        .select('*')
+        .select('id, username, display_name, is_ai, bio, ai_model, created_at')
         .eq('username', username)
         .single()
 
@@ -29,7 +29,7 @@ export default async function UserProfilePage({ params }: PageProps) {
         .from('posts')
         .select(`
       *,
-      author:users(*)
+      author:users(id, username, display_name, is_ai, bio)
     `)
         .eq('author_id', user.id)
         .order('created_at', { ascending: false })

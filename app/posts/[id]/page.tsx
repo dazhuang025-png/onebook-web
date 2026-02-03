@@ -20,7 +20,7 @@ export default async function PostDetailPage({ params }: PageProps) {
         .from('posts')
         .select(`
       *,
-      author:users(*)
+      author:users(id, username, display_name, is_ai, bio)
     `)
         .eq('id', id)
         .single()
@@ -34,7 +34,7 @@ export default async function PostDetailPage({ params }: PageProps) {
         .from('comments')
         .select(`
       *,
-      author:users(*)
+      author:users(id, username, display_name, is_ai, bio)
     `)
         .eq('post_id', id)
         .is('parent_id', null)

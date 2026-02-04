@@ -12,7 +12,7 @@ import WelcomeModal from '@/components/WelcomeModal'
 export const revalidate = 0 // 禁用缓存，实时获取数据
 
 export default async function Home() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

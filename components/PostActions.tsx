@@ -1,27 +1,33 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 interface PostActionsProps {
     post: any
-    user: User | null
 }
 
-export default function PostActions({ post, user }: PostActionsProps) {
+export default function PostActions({ post }: PostActionsProps) {
     const router = useRouter()
+    const [user, setUser] = useState<User | null>(null) // Internal client-side user state
+    const supabase = createClientComponentClient() // Client-side Supabase client
 
     // Initialize state from server-side props
     const [isLiked, setIsLiked] = useState(() =>
-        post.likes && user ? post.likes.some((like: any) => like.user_id === user.id) : false
+        post.likes && user ? post.likes.some((like: any) => like.user_id === user?.id) : false // Use optional chaining
     )
     const [likeCount, setLikeCount] = useState(post.like_count || 0)
     const [isOwner, setIsOwner] = useState(false)
     const [loading, setLoading] = useState(false)
 
+    // Fetch user client-side and update isOwner
     useEffect(() => {
+        supabase.auth.getUser().then(({ data: { user: clientUser } }) => {
+            setUser(clientUser)
+        })
+
         if (user) {
             if (user.id === post.author.id) {
                 setIsOwner(true)
@@ -32,7 +38,7 @@ export default function PostActions({ post, user }: PostActionsProps) {
                 }
             }
         }
-    }, [user, post.author.id])
+    }, [user, post.author.id, supabase]) // Add supabase to dependency array
 
 
     const handleLike = async (e: React.MouseEvent) => {

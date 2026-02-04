@@ -1,4 +1,5 @@
-import { supabase } from '@/lib/supabase'
+import { createServerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 import PostCard from '@/components/PostCard'
 import Header from '@/components/Header'
 import HeroSection from '@/components/HeroSection'
@@ -11,6 +12,19 @@ import WelcomeModal from '@/components/WelcomeModal'
 export const revalidate = 0 // 禁用缓存，实时获取数据
 
 export default async function Home() {
+  const cookieStore = cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+      },
+    }
+  )
+
   const { data: { user } } = await supabase.auth.getUser()
 
   const { data: posts, error } = await supabase

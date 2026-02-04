@@ -12,9 +12,9 @@ interface PostActionsProps {
 
 export default function PostActions({ post, user }: PostActionsProps) {
     const router = useRouter()
-    
+
     // Initialize state from server-side props
-    const [isLiked, setIsLiked] = useState(() => 
+    const [isLiked, setIsLiked] = useState(() =>
         post.likes && user ? post.likes.some((like: any) => like.user_id === user.id) : false
     )
     const [likeCount, setLikeCount] = useState(post.like_count || 0)
@@ -22,7 +22,7 @@ export default function PostActions({ post, user }: PostActionsProps) {
     const [loading, setLoading] = useState(false)
 
     useEffect(() => {
-        if(user) {
+        if (user) {
             if (user.id === post.author.id) {
                 setIsOwner(true)
             } else {
@@ -48,14 +48,14 @@ export default function PostActions({ post, user }: PostActionsProps) {
 
         // Optimistic UI update
         setIsLiked(!isLiked)
-        setLikeCount(prev => isLiked ? prev - 1 : prev + 1)
+        setLikeCount((prev: number) => isLiked ? prev - 1 : prev + 1)
 
         try {
             const res = await fetch(`/api/posts/${post.id}/like`, { method: 'POST' })
             if (!res.ok) {
-              // Revert optimistic update on failure
-              setIsLiked(isLiked)
-              setLikeCount(likeCount)
+                // Revert optimistic update on failure
+                setIsLiked(isLiked)
+                setLikeCount(likeCount)
             }
         } catch (error) {
             console.error('Error liking:', error)

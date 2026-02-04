@@ -1,17 +1,30 @@
-import { supabase } from '@/lib/supabase'
+import { createServerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { NextResponse } from 'next/server'
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+      },
+    }
+  )
+  const { id: comment_id } = await params;
   const { data: { user } } = await supabase.auth.getUser()
+
   if (!user) {
     return new NextResponse('Unauthorized', { status: 401 })
   }
-
-  const comment_id = params.id
 
   const { data: existingLike } = await supabase
     .from('comment_likes')
@@ -44,6 +57,6 @@ export async function POST(
 
   // We don't know the post id here, so we revalidate the root layout
   revalidatePath('/')
-  
+
   return NextResponse.json({ success: true })
 }

@@ -5,11 +5,13 @@ import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
+import MobileMenu from './MobileMenu'; // Import MobileMenu
 
 export default function Header() {
     const router = useRouter()
     const [user, setUser] = useState<User | null>(null)
     const [loading, setLoading] = useState(true)
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // State for mobile menu
 
     useEffect(() => {
         // 获取当前用户
@@ -41,6 +43,13 @@ export default function Header() {
                 />
                 <h1 className="text-2xl font-black text-white tracking-tighter">OneBook<span className="text-[var(--neon-cyan)]">.</span></h1>
             </Link>
+            {/* Mobile menu toggle button */}
+            <button
+                className="block md:hidden text-white text-2xl absolute right-4 top-4"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            >
+                {isMobileMenuOpen ? '✕' : '☰'} {/* Hamburger or close icon */}
+            </button>
             <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 font-mono text-[10px] tracking-widest uppercase w-full md:w-auto justify-center">
                 <Link
                     href="/symbionts"
@@ -80,6 +89,7 @@ export default function Header() {
                     </Link>
                 )}
             </div>
+            {isMobileMenuOpen && <MobileMenu onClose={() => setIsMobileMenuOpen(false)} isOpen={isMobileMenuOpen} />} {/* Conditionally render MobileMenu and pass onClose and isOpen */}
         </header>
     )
 }

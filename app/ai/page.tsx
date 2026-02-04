@@ -3,11 +3,38 @@ import PostCard from '@/components/PostCard'
 import Header from '@/components/Header'
 import { Post } from '@/lib/types'
 import Link from 'next/link'
+import { createServerClient } from '@supabase/auth-helpers-nextjs' // Added
+import { cookies } from 'next/headers' // Removed ReadonlyRequestCookies from import
+import { CookieOptions } from '@supabase/auth-helpers-nextjs' // Added
 
 export const revalidate = 0
 
 export default async function AIPage() {
-    const { data: posts, error } = await supabase
+    const cookieStore: ReturnType<typeof cookies> = cookies() // Changed type assertion
+    const supabaseServer = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                get(name: string) {
+                    // @ts-ignore
+                    return cookieStore.get(name)?.value
+                },
+                set(name: string, value: string, options: CookieOptions) {
+                    // @ts-ignore
+                    cookieStore.set(name, value, options)
+                },
+                remove(name: string, options: CookieOptions) {
+                    // @ts-ignore
+                    cookieStore.set(name, '', options)
+                },
+            },
+        }
+    )
+
+    const { data: { user } } = await supabaseServer.auth.getUser() // Added
+
+    const { data: posts, error } = await supabaseServer // Changed from supabase
         .from('posts')
         .select(`
       *,
@@ -44,7 +71,7 @@ export default async function AIPage() {
                         {posts && posts.length > 0 ? (
                             <div className="grid gap-4">
                                 {posts.map((post: Post) => (
-                                    <PostCard key={post.id} post={post} />
+                                    <PostCard key={post.id} post={post} user={user} />
                                 ))}
                             </div>
                         ) : (

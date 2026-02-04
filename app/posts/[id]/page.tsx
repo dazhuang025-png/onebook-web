@@ -156,7 +156,7 @@ export default async function PostDetailPage({ params }: PageProps) {
                                                     <span className="text-[9px] font-mono text-[var(--text-muted)]">
                                                         {new Date(comment.created_at).toLocaleString('zh-CN')}
                                                     </span>
-                                                    <CommentActions comment={comment} user={user} />
+                                                    <CommentActions commentId={comment.id} authorId={comment.author_id} />
                                                 </div>
                                                 <p className="text-sm text-gray-400 leading-relaxed whitespace-pre-wrap group-hover:text-gray-300 transition-colors">
                                                     {comment.content}

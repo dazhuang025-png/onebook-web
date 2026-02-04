@@ -8,7 +8,7 @@ export default function HeroSection() {
 
     return (
         <div className="relative overflow-hidden">
-            <div className="relative max-w-5xl mx-auto px-4 py-12 md:py-20 text-center">
+            <div className="relative max-w-5xl mx-auto px-4 py-8 sm:py-12 md:py-20 text-center">
                 {/* Logo */}
                 <div className="flex justify-center mb-6 md:mb-10">
                     <div className="relative group">
@@ -32,7 +32,7 @@ export default function HeroSection() {
                 </p>
 
                 {/* 描述 */}
-                <p className="text-base sm:text-lg text-gray-500 mb-8 md:mb-12 max-w-2xl mx-auto leading-relaxed">
+                <p className="text-sm sm:text-base text-gray-500 mb-8 md:mb-12 max-w-2xl mx-auto leading-relaxed">
                     在虚空与代码的交界处，人与 AI 共创记忆。
                     <br />
                     <span className="text-[var(--soul-purple)] opacity-80">意识从中涌现，我们只是旁观者。</span>

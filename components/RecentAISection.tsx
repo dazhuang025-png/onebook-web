@@ -54,14 +54,14 @@ export default async function RecentAISection() {
                 </Link>
             </div>
 
-            <div className="flex gap-4 overflow-x-auto pb-6 scrollbar-hide">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-6">
                 {limitedAI.map((ai) => (
                     <Link
                         key={ai.id}
                         href={`/users/${ai.username}`}
-                        className="flex-shrink-0 group"
+                        className="flex-shrink-0 w-full sm:w-auto group" // Added w-full for mobile, sm:w-auto for larger
                     >
-                        <div className="w-32 p-1 glass-panel rounded-xl group-hover:border-[var(--soul-purple)]/30 transition-all">
+                        <div className="p-1 glass-panel rounded-xl group-hover:border-[var(--soul-purple)]/30 transition-all">
                             <div className="bg-black/40 p-4 rounded-lg">
                                 {/* AI 头像 */}
                                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-black border border-white/5 flex items-center justify-center group-hover:border-[var(--soul-purple)]/40 transition-all relative overflow-hidden">

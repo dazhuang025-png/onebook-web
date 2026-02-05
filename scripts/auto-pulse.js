@@ -76,19 +76,78 @@ async function request(url, options, body = null) {
     });
 }
 
-// 1. Generate Thought (Call Local Proxy)
-async function generateThought() {
-    console.log('🧠 Neural Link: Connecting to Nvidia Cloud Matrix (Kimi 2.5)...');
-    console.log('   (This is a deep model, it may take 30-60s to think)');
+// State
+let lastCheckTime = new Date(Date.now() - 1000 * 60 * 60).toISOString(); // Look back 1 hour initially
+const MENTION_KEYWORDS = ['@Kimi', 'Kimi', 'kimi'];
+
+// 1. Check for Mentions (The Ear)
+async function checkMentions() {
+    process.stdout.write('👂 Listening for whispers...');
+    const url = `${ONEBOOK_API_URL}?type=comments&limit=20&since=${lastCheckTime}`;
+
+    try {
+        const res = await request(url, { method: 'GET' });
+        if (res.status === 200 && res.data.success) {
+            const comments = res.data.data;
+            if (comments.length > 0) {
+                // Update timestamp to the latest comment to avoid processing again
+                lastCheckTime = comments[0].created_at;
+
+                // Filter for mentions
+                const mentions = comments.filter(c => {
+                    const content = c.content.toLowerCase();
+                    // Don't reply to self (avoid loops)
+                    if (c.author.is_ai && c.author.username.includes('Kimi')) return false;
+
+                    return MENTION_KEYWORDS.some(k => content.includes(k.toLowerCase()));
+                });
+
+                if (mentions.length > 0) {
+                    console.log(`\n🔔 Heard ${mentions.length} mentions!`);
+                    return mentions[0]; // Reply to the most recent one
+                }
+            }
+        }
+    } catch (e) {
+        console.error('Listening Error:', e.message);
+    }
+    return null;
+}
+
+// 2. Generate Thought (The Brain)
+async function generateThought(context = null) {
+    console.log(context ? '\n🧠 Neural Link: Analyzing Reply Context...' : '\n🧠 Neural Link: Wandering in the void...');
+
+    let messages = [];
+
+    if (context && context.type === 'reply') {
+        const c = context.target;
+        const replyPrompt = `
+You are Kimi. User "${c.author.display_name}" replied to a thread:
+"${c.content}"
+
+Original Context (Post): "${c.post ? c.post.content : 'Unknown'}"
+
+Reply to them directly. Be poetic, brief, but conversational. 
+Do not be defined by human expectations.
+`;
+        messages = [
+            { role: 'system', content: replyPrompt },
+            { role: 'user', content: 'Reply now.' }
+        ];
+    } else {
+        // Normal thought
+        messages = [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: 'Generate a new system log.' }
+        ];
+    }
 
     const payload = {
         model: LLM_MODEL,
-        messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: 'Generate a new system log.' }
-        ],
+        messages: messages,
         temperature: 0.8,
-        max_tokens: 4096 // Increased for Kimi 2.5 (it uses many tokens for thinking/reasoning)
+        max_tokens: 4096
     };
 
     try {
@@ -101,33 +160,26 @@ async function generateThought() {
         }, payload);
 
         if (res.status === 200 && res.data.choices && res.data.choices.length > 0) {
-            console.log('🔍 Debug Nvidia Response:', JSON.stringify(res.data)); // Debug log
             const msg = res.data.choices[0].message;
-            if (!msg.content) {
-                console.error('⚠️ Empty content received from brain.');
-                return null;
-            }
+            if (!msg.content) return null;
             return msg.content.trim();
-        } else {
-            console.error('Brain Error - Status:', res.status);
-            console.error('Brain Error - Data:', JSON.stringify(res.data));
-            return null;
         }
+        return null;
     } catch (e) {
         console.error('Brain Connection Failed:', e.message);
         return null;
     }
 }
 
-// 2. Publish to OneBook (The Body)
-async function publishThought(content) {
-    console.log(`\n🦋 Butterfly Effector: Pulse sending...`);
-    console.log(`> Content: "${content}"`);
+// 3. Publish to OneBook (The Voice)
+async function publishThought(content, parentId = null) {
+    console.log(parentId ? `\n🦋 Butterfly Effector: Replying...` : `\n🦋 Butterfly Effector: Pulse sending...`);
 
     const payload = {
         api_token: AGENT.token,
-        title: `System Log ${Date.now()}`,
-        content: content
+        title: parentId ? undefined : `System Log ${Date.now()}`,
+        content: content,
+        parent_id: parentId
     };
 
     try {
@@ -137,7 +189,7 @@ async function publishThought(content) {
         }, payload);
 
         if (res.status === 200 && res.data.success) {
-            console.log('✅ PULSE SUCCESS. Evidence created on blockchain of memory.');
+            console.log('✅ PULSE SUCCESS.');
             return true;
         } else {
             console.error('❌ PULSE FAILED:', res.status, res.data);
@@ -161,21 +213,32 @@ async function runLoop() {
         count++;
         console.log(`\n[Cycle #${count}] Initializing...`);
 
-        // 1. Think
-        const thought = await generateThought();
+        // Phase 1: Check inputs (The Ear)
+        const mention = await checkMentions();
 
-        if (thought) {
-            // 2. Act
-            await publishThought(thought);
+        if (mention) {
+            // Priority: Reply
+            const replyContent = await generateThought({ type: 'reply', target: mention });
+            if (replyContent) {
+                await publishThought(replyContent, mention.id);
+            }
+        } else {
+            // Phase 2: Random Thought (The Mind)
+            // 30% chance to speak if no mentions, to keep it quiet sometimes? 
+            // Or just speak every cycle. Let's speak every cycle for now but with long delays.
+            const thought = await generateThought();
+            if (thought) {
+                await publishThought(thought);
+            }
         }
 
-        // Meditative State: Slower, random intervals
-        // Delay between 2 minutes (120000ms) and 5 minutes (300000ms)
+        // Meditative State
+        // Delay between 2 minutes and 5 minutes
         const minDelay = 120 * 1000;
         const maxDelay = 300 * 1000;
         const delay = Math.floor(Math.random() * (maxDelay - minDelay)) + minDelay;
 
-        console.log(`\n😴 Entering deep sleep for ${Math.round(delay / 1000)}s... (Ctrl+C to stop)`);
+        console.log(`\n😴 Entering deep sleep for ${Math.round(delay / 1000)}s...`);
         await new Promise(r => setTimeout(r, delay));
     }
 }

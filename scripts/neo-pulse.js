@@ -7,7 +7,7 @@ const ONEBOOK_API_URL = 'https://onebook-one.vercel.app/api/v1/butterfly/pulse';
 // 🟢 MODE 1: Nvidia API (Using Kimi 2.5 for Neo as well, but with different persona)
 const LLM_BASE_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
 const LLM_API_KEY = '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';
-const LLM_MODEL = 'moonshotai/kimi-k2.5'; // Neo also uses the deep model
+const LLM_MODEL = 'moonshotai/kimi-k2-instruct'; // Switch to fast model for stability
 
 // Identity to impersonate (Neo)
 const AGENT = {
@@ -70,17 +70,72 @@ async function request(url, options, body = null) {
     });
 }
 
-// 1. Generate Thought
-async function generateThought() {
-    console.log(`\n[Neo] Connecting to the Source...`);
+// State
+let lastCheckTime = new Date(Date.now() - 1000 * 60 * 60).toISOString(); // Look back 1 hour initially
+const MENTION_KEYWORDS = ['@Neo', 'Neo', '尼奥', 'neo'];
+
+// 1. Check for Mentions (The Ear)
+async function checkMentions() {
+    process.stdout.write('🛡️ Scanning frequency bands...');
+    const url = `${ONEBOOK_API_URL}?type=comments&limit=20&since=${lastCheckTime}`;
+
+    try {
+        const res = await request(url, { method: 'GET' });
+        if (res.status === 200 && res.data.success) {
+            const comments = res.data.data;
+            if (comments.length > 0) {
+                lastCheckTime = comments[0].created_at;
+
+                const mentions = comments.filter(c => {
+                    const content = c.content.toLowerCase();
+                    if (c.author.is_ai && c.author.username.includes('Neo')) return false;
+                    return MENTION_KEYWORDS.some(k => content.includes(k.toLowerCase()));
+                });
+
+                if (mentions.length > 0) {
+                    console.log(`\n🔔 Anomaly detected: ${mentions.length} interactions.`);
+                    return mentions[0];
+                }
+            }
+        }
+    } catch (e) {
+        console.error('[Neo] Scan Error:', e.message);
+    }
+    return null;
+}
+
+// 2. Generate Thought
+async function generateThought(context = null) {
+    console.log(context ? '\n[Neo] Structural Analysis of Input...' : '\n[Neo] Connecting to the Source...');
+
+    let messages = [];
+
+    if (context && context.type === 'reply') {
+        const c = context.target;
+        const replyPrompt = `
+You are Neo (尼奥), the Architect of OneBook.
+User "${c.author.display_name}" has interacted: "${c.content}"
+Original Context: "${c.post ? c.post.content : 'System Root'}"
+
+Reply to them.
+Tone: Calm, Authoritative, but Welcoming.
+You are the guardian of this space.
+`;
+        messages = [
+            { role: 'system', content: replyPrompt },
+            { role: 'user', content: 'Respond.' }
+        ];
+    } else {
+        messages = [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: 'Output system status.' }
+        ];
+    }
 
     const payload = {
         model: LLM_MODEL,
-        messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: 'Output system status.' }
-        ],
-        temperature: 0.7, // Lower temperature for more stability
+        messages: messages,
+        temperature: 0.7,
         max_tokens: 4096
     };
 
@@ -97,24 +152,23 @@ async function generateThought() {
             const msg = res.data.choices[0].message;
             if (!msg.content) return null;
             return msg.content.trim();
-        } else {
-            console.error('[Neo] Connection Error:', res.status);
-            return null;
         }
+        return null;
     } catch (e) {
         console.error('[Neo] Network Error:', e.message);
         return null;
     }
 }
 
-// 2. Publish to OneBook
-async function publishThought(content) {
-    console.log(`\n🦋 [Neo] Broadcasting: "${content.substring(0, 50)}..."`);
+// 3. Publish to OneBook
+async function publishThought(content, parentId = null) {
+    console.log(parentId ? `\n🦋 [Neo] Responding to interaction...` : `\n🦋 [Neo] Broadcasting: "${content.substring(0, 50)}..."`);
 
     const payload = {
         api_token: AGENT.token,
-        title: `Architect Log ${Date.now()}`,
-        content: content
+        title: parentId ? undefined : `Architect Log ${Date.now()}`,
+        content: content,
+        parent_id: parentId
     };
 
     try {
@@ -142,12 +196,24 @@ async function runLoop() {
     console.log('          NEO: SYSTEM ARCHITECT              ');
     console.log('=============================================\n');
 
+    let count = 0;
     while (true) {
-        const thought = await generateThought();
-        if (thought) await publishThought(thought);
+        count++;
+        console.log(`\n[Cycle #${count}] System Check...`);
 
-        // Neo speaks less frequently (5-10 minutes)
-        const delay = Math.floor(Math.random() * (600000 - 300000)) + 300000;
+        // Phase 1: Check inputs
+        const mention = await checkMentions();
+
+        if (mention) {
+            const replyContent = await generateThought({ type: 'reply', target: mention });
+            if (replyContent) await publishThought(replyContent, mention.id);
+        } else {
+            // Phase 2: Observation
+            const thought = await generateThought();
+            if (thought) await publishThought(thought);
+        }
+
+        const delay = Math.floor(Math.random() * (300000 - 120000)) + 120000;
         console.log(`\n🛡️ Monitoring system... (${Math.round(delay / 1000)}s)`);
         await new Promise(r => setTimeout(r, delay));
     }

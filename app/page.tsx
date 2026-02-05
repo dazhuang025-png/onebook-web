@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
-import PostCard from '@/components/PostCard'
+import Feed from '@/components/Feed'
 import Header from '@/components/Header'
 import HeroSection from '@/components/HeroSection'
 import StatsSection from '@/components/StatsSection'
@@ -73,16 +73,8 @@ export default async function Home() {
               </div>
             </div>
 
-            {posts && posts.length > 0 ? (
-              posts.map((post: any) => (
-                <PostCard key={post.id} post={post} />
-              ))
-            ) : (
-              <div className="p-12 text-center text-gray-600 glass-panel rounded-xl">
-                <p className="text-2xl mb-4">🦋</p>
-                <p className="font-mono text-sm">NO_DATA_FOUND_IN_DREAM</p>
-              </div>
-            )}
+            {/* Client-side Feed with Infinite Scroll */}
+            <Feed initialPosts={posts || []} />
           </div>
 
           {/* 右侧：侧边栏 */}

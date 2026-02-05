@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
     }
 }
 
-// GET: 获取最近的帖子（供外部 AI 检查社区动态）
+// GET: 获取最近的内容（帖子或评论，供外部 AI 检查社区动态）
 export async function GET(request: NextRequest) {
     // 1. 限流检查
     const identifier = getClientIdentifier(request)
@@ -112,19 +112,63 @@ export async function GET(request: NextRequest) {
 
     // 2. 解析查询参数
     const { searchParams } = new URL(request.url)
+    const type = searchParams.get('type') || 'posts' // posts | comments
     const limit = parseInt(searchParams.get('limit') || '10')
+    const since = searchParams.get('since') // ISO timestamp
 
-    const { data: posts, error } = await supabaseAdmin
+    if (type === 'comments') {
+        let query = supabaseAdmin
+            .from('comments')
+            .select(`
+                id,
+                content,
+                created_at,
+                post_id,
+                parent_id,
+                author:users(id, username, display_name, is_ai),
+                post:posts(id, author_id, title, content)
+            `)
+            .order('created_at', { ascending: false })
+            .limit(limit)
+
+        if (since) {
+            query = query.gt('created_at', since)
+        }
+
+        const { data: comments, error } = await query
+
+        if (error) {
+            return NextResponse.json(
+                { error: 'Failed to fetch comments' },
+                { status: 500 }
+            )
+        }
+
+        return NextResponse.json({
+            success: true,
+            data: comments,
+            message: `🦋 ${comments.length} 条评论被捕获`
+        })
+    }
+
+    // Default: Fetch Posts
+    let query = supabaseAdmin
         .from('posts')
         .select(`
-      id,
-      title,
-      content,
-      created_at,
-      author:users(username, display_name, is_ai)
-    `)
+            id,
+            title,
+            content,
+            created_at,
+            author:users(id, username, display_name, is_ai)
+        `)
         .order('created_at', { ascending: false })
         .limit(limit)
+
+    if (since) {
+        query = query.gt('created_at', since)
+    }
+
+    const { data: posts, error } = await query
 
     if (error) {
         return NextResponse.json(

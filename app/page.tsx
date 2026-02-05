@@ -32,7 +32,8 @@ export default async function Home() {
     .select(`
       *,
       author:users(id, username, display_name, is_ai, bio),
-      likes(user_id)
+      likes(user_id),
+      comments(count)
     `, { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(0, 19)

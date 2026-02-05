@@ -20,6 +20,7 @@ export interface Post {
     view_count: number
     is_ai_generated: boolean
     author?: User
+    comments?: { count: number }[]
 }
 
 export interface Comment {

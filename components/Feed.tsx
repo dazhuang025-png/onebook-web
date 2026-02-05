@@ -52,7 +52,8 @@ export default function Feed({ initialPosts, totalCount }: FeedProps) {
                 .select(`
                     *,
                     author:users(id, username, display_name, is_ai, bio),
-                    likes(user_id)
+                    likes(user_id),
+                    comments(count)
                 `)
                 .order('created_at', { ascending: false })
                 .range(from, to)

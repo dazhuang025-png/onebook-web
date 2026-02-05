@@ -3,71 +3,85 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
-import { createClient } from '@/lib/supabase-client'
+import { createBrowserClient } from '@supabase/auth-helpers-nextjs'
 
 interface PostActionsProps {
     post: any
+    commentCount?: number
 }
 
-export default function PostActions({ post }: PostActionsProps) {
+export default function PostActions({ post, commentCount = 0 }: PostActionsProps) {
     const router = useRouter()
-    const [user, setUser] = useState<User | null>(null) // Internal client-side user state
-    const supabase = createClient() // Client-side Supabase client
+    const [user, setUser] = useState<User | null>(null)
 
-    // Initialize state from server-side props
-    const [isLiked, setIsLiked] = useState(() =>
-        post.likes && user ? post.likes.some((like: any) => like.user_id === user?.id) : false // Use optional chaining
+    // Use createBrowserClient for correct client-side auth state
+    const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     )
+
+    // Initialize state
+    const [isLiked, setIsLiked] = useState<boolean>(false)
     const [likeCount, setLikeCount] = useState(post.like_count || 0)
     const [isOwner, setIsOwner] = useState(false)
     const [loading, setLoading] = useState(false)
 
-    // Fetch user client-side and update isOwner
+    // Fetch user and check like status
     useEffect(() => {
-        supabase.auth.getUser().then(({ data: { user: clientUser } }) => {
+        const checkUser = async () => {
+            const { data: { user: clientUser } } = await supabase.auth.getUser()
             setUser(clientUser)
-        })
 
-        if (user) {
-            if (user.id === post.author.id) {
-                setIsOwner(true)
-            } else {
-                // This is a simple admin check, consider a more robust role system for production
-                if (user.email?.endsWith('@bolana.studio')) {
+            if (clientUser && post.likes) {
+                const liked = post.likes.some((like: any) => like.user_id === clientUser.id)
+                setIsLiked(liked)
+            }
+
+            if (clientUser) {
+                if (clientUser.id === post.author.id) {
+                    setIsOwner(true)
+                } else if (clientUser.email?.endsWith('@bolana.studio')) {
                     setIsOwner(true)
                 }
             }
         }
-    }, [user, post.author.id, supabase]) // Add supabase to dependency array
-
+        checkUser()
+    }, [post.id, supabase])
 
     const handleLike = async (e: React.MouseEvent) => {
         e.preventDefault()
         e.stopPropagation()
-        if (!user) {
+
+        // Double check auth current state
+        const { data: { user: currentUser } } = await supabase.auth.getUser()
+
+        if (!currentUser) {
             alert('请先初始化 (登录) 后再点赞')
-            router.push('/login')
+            // Pass the current path as returnTo
+            router.push(`/login?returnTo=${encodeURIComponent(window.location.pathname)}`)
             return
         }
+
         if (loading) return
         setLoading(true)
 
         // Optimistic UI update
+        const previousLiked = isLiked
+        const previousCount = likeCount
+
         setIsLiked(!isLiked)
-        setLikeCount((prev: number) => isLiked ? prev - 1 : prev + 1)
+        setLikeCount((prev: number) => !previousLiked ? prev + 1 : prev - 1)
 
         try {
             const res = await fetch(`/api/posts/${post.id}/like`, { method: 'POST' })
             if (!res.ok) {
-                // Revert optimistic update on failure
-                setIsLiked(isLiked)
-                setLikeCount(likeCount)
+                setIsLiked(previousLiked)
+                setLikeCount(previousCount)
             }
         } catch (error) {
             console.error('Error liking:', error)
-            // Revert optimistic update on failure
-            setIsLiked(isLiked)
-            setLikeCount(likeCount)
+            setIsLiked(previousLiked)
+            setLikeCount(previousCount)
         } finally {
             setLoading(false)
         }
@@ -82,7 +96,6 @@ export default function PostActions({ post }: PostActionsProps) {
             const res = await fetch(`/api/posts/${post.id}`, { method: 'DELETE' })
             if (res.ok) {
                 alert('记忆已抹除')
-                // Instead of router.push, we just refresh to see the updated list
                 router.refresh()
             } else {
                 const data = await res.json()
@@ -95,7 +108,7 @@ export default function PostActions({ post }: PostActionsProps) {
 
     return (
         <div className="flex items-center gap-4 sm:gap-6 mt-4 pt-4 border-t border-white/10">
-            {/* 点赞按钮 */}
+            {/* Like */}
             <button
                 onClick={handleLike}
                 disabled={loading}
@@ -111,17 +124,27 @@ export default function PostActions({ post }: PostActionsProps) {
                 </span>
             </button>
 
-            {/* 浏览量 (只读) */}
-            <div className="flex items-center gap-2 text-gray-500">
+            {/* Comments (New) */}
+            <div className="flex items-center gap-2 text-gray-500 group cursor-pointer hover:text-[var(--neon-cyan)] transition-colors">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center border border-white/5 bg-black/20 group-hover:border-[var(--neon-cyan)]/30 transition-all">
+                    <span className="text-sm">💬</span>
+                </div>
+                <span className="text-[10px] font-mono tracking-widest uppercase">
+                    COMMENTS: <span className="text-gray-400 group-hover:text-white transition-colors">{commentCount}</span>
+                </span>
+            </div>
+
+            {/* Views */}
+            <div className="flex items-center gap-2 text-gray-500 hidden sm:flex">
                 <div className="w-8 h-8 rounded-full flex items-center justify-center border border-white/5 bg-black/20">
-                    <span className="text-sm">👁️</span>
+                    <span className="text-sm opacity-50">👁️</span>
                 </div>
                 <span className="text-[10px] font-mono tracking-widest uppercase">
                     VIEWS: {post.view_count || 0}
                 </span>
             </div>
 
-            {/* 删除按钮 (仅所有者/管理员) */}
+            {/* Delete */}
             {isOwner && (
                 <button
                     onClick={handleDelete}
@@ -130,7 +153,6 @@ export default function PostActions({ post }: PostActionsProps) {
                     <div className="w-8 h-8 rounded-full flex items-center justify-center border border-white/5 bg-black/20 group-hover:border-red-500/30 group-hover:bg-red-500/5 transition-all">
                         <span className="text-xs group-hover:animate-pulse">🗑️</span>
                     </div>
-                    <span>ERASE</span>
                 </button>
             )}
         </div>

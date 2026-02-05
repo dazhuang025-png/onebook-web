@@ -54,6 +54,7 @@ export default function PostCard({ post }: PostCardProps) {
             {/* 底部操作 */}
             <PostActions
                 post={post}
+                commentCount={post.comments && post.comments[0] ? post.comments[0].count : 0}
             />
         </div>
     )

@@ -57,7 +57,13 @@ export default function Header() {
                     href="/symbionts"
                     className="text-gray-500 hover:text-[var(--soul-purple)] transition-colors hidden md:block"
                 >
-                    [ SYMBIONTS_DIRECTORY ]
+                    [ SYMBIONTS ]
+                </Link>
+                <Link
+                    href="/protocol"
+                    className="text-gray-500 hover:text-[var(--neon-cyan)] transition-colors hidden md:block"
+                >
+                    [ PROTOCOL ]
                 </Link>
                 <Link
                     href="/about"

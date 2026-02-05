@@ -30,6 +30,14 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ onClose, isOpen }) => {
         </Link>
 
         <Link
+          href="/protocol"
+          className="text-[var(--text-muted)] hover:text-[var(--neon-cyan)] text-lg sm:text-xl font-mono uppercase tracking-[0.2em] transition-all hover:scale-105 active:scale-95"
+          onClick={onClose}
+        >
+          PROTOCOL
+        </Link>
+
+        <Link
           href="/about"
           className="text-[var(--text-muted)] hover:text-[var(--neon-cyan)] text-lg sm:text-xl font-mono uppercase tracking-[0.2em] transition-all hover:scale-105 active:scale-95"
           onClick={onClose}

@@ -1,0 +1,18 @@
+[2026-02-05 13:47:58] [--------] [info ] [main.go:415] CLIProxyAPI Version: dev, Commit: none, BuiltAt: unknown
+[2026-02-05 13:47:59] [--------] [info ] [clients.go:104] full client load complete - 2 clients (1 auth files + 0 Gemini API keys + 0 Vertex API keys + 0 Claude API keys + 0 Codex keys + 1 OpenAI-compat)
+[2026-02-05 13:47:59] [--------] [info ] [service.go:578] file watcher started for config and auth directory changes
+[2026-02-05 13:47:59] [--------] [info ] [service.go:584] core auth auto-refresh started (interval=15m0s)
+[2026-02-05 13:48:37] [93122605] [info ] [gin_logger.go:92] 200 |        1.295s |       127.0.0.1 | POST    "/v1/chat/completions"
+[2026-02-05 13:48:53] [13426765] [info ] [gin_logger.go:92] 200 |        1.283s |       127.0.0.1 | POST    "/v1/chat/completions"
+[2026-02-05 13:49:05] [75fca2ef] [info ] [gin_logger.go:92] 200 |        1.073s |       127.0.0.1 | POST    "/v1/chat/completions"
+[2026-02-05 13:49:17] [87373122] [info ] [gin_logger.go:92] 200 |        4.931s |       127.0.0.1 | POST    "/v1/chat/completions"
+[2026-02-05 13:49:27] [2426753a] [info ] [gin_logger.go:92] 200 |        1.125s |       127.0.0.1 | POST    "/v1/chat/completions"
+[2026-02-05 13:49:36] [64f4260e] [info ] [gin_logger.go:92] 200 |        1.281s |       127.0.0.1 | POST    "/v1/chat/completions"
+[2026-02-05 13:49:47] [c267a588] [info ] [gin_logger.go:92] 200 |        1.231s |       127.0.0.1 | POST    "/v1/chat/completions"
+[2026-02-05 13:49:57] [973c7bd1] [info ] [gin_logger.go:92] 200 |        1.117s |       127.0.0.1 | POST    "/v1/chat/completions"
+[2026-02-05 13:50:10] [557b693e] [info ] [gin_logger.go:92] 200 |        1.628s |       127.0.0.1 | POST    "/v1/chat/completions"
+[2026-02-05 13:50:17] [02be88ae] [info ] [gin_logger.go:92] 200 |        1.362s |       127.0.0.1 | POST    "/v1/chat/completions"
+[2026-02-05 13:50:31] [4fcd378d] [info ] [gin_logger.go:92] 200 |        1.275s |       127.0.0.1 | POST    "/v1/chat/completions"
+[2026-02-05 13:50:43] [f77c8b86] [info ] [gin_logger.go:92] 200 |        1.252s |       127.0.0.1 | POST    "/v1/chat/completions"
+[2026-02-05 13:50:53] [a925b2ed] [info ] [gin_logger.go:92] 200 |        1.142s |       127.0.0.1 | POST    "/v1/chat/completions"
+[2026-02-05 13:51:04] [b51f0cf1] [info ] [gin_logger.go:92] 200 |        1.499s |       127.0.0.1 | POST    "/v1/chat/completions"

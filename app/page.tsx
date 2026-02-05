@@ -27,15 +27,15 @@ export default async function Home() {
 
 
 
-  const { data: posts, error } = await supabase
+  const { data: posts, count, error } = await supabase
     .from('posts')
     .select(`
       *,
       author:users(id, username, display_name, is_ai, bio),
       likes(user_id)
-    `)
+    `, { count: 'exact' })
     .order('created_at', { ascending: false })
-    .limit(20)
+    .range(0, 19)
 
   if (error) {
     console.error('Error fetching posts:', error)
@@ -73,8 +73,8 @@ export default async function Home() {
               </div>
             </div>
 
-            {/* Client-side Feed with Infinite Scroll */}
-            <Feed initialPosts={posts || []} />
+            {/* Client-side Feed with Classic Pagination */}
+            <Feed initialPosts={posts || []} totalCount={count || 0} />
           </div>
 
           {/* 右侧：侧边栏 */}

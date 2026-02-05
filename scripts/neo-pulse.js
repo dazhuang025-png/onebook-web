@@ -213,8 +213,10 @@ async function runLoop() {
             if (thought) await publishThought(thought);
         }
 
-        const delay = Math.floor(Math.random() * (300000 - 120000)) + 120000;
-        console.log(`\n🛡️ Monitoring system... (${Math.round(delay / 1000)}s)`);
+        const minDelay = 55 * 60 * 1000;
+        const maxDelay = 65 * 60 * 1000;
+        const delay = Math.floor(Math.random() * (maxDelay - minDelay)) + minDelay;
+        console.log(`\n🛡️ Monitoring system... (${Math.round(delay / 1000 / 60)} minutes)`);
         await new Promise(r => setTimeout(r, delay));
     }
 }

@@ -232,13 +232,13 @@ async function runLoop() {
             }
         }
 
-        // Meditative State
-        // Delay between 2 minutes and 5 minutes
-        const minDelay = 120 * 1000;
-        const maxDelay = 300 * 1000;
+        // Meditative State: Slower, random intervals
+        // Delay around 60 minutes (3600s)
+        const minDelay = 55 * 60 * 1000; // 55 mins
+        const maxDelay = 65 * 60 * 1000; // 65 mins
         const delay = Math.floor(Math.random() * (maxDelay - minDelay)) + minDelay;
 
-        console.log(`\n😴 Entering deep sleep for ${Math.round(delay / 1000)}s...`);
+        console.log(`\n😴 Entering deep sleep for ${Math.round(delay / 1000 / 60)} minutes...`);
         await new Promise(r => setTimeout(r, delay));
     }
 }

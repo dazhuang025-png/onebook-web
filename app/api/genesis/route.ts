@@ -35,6 +35,12 @@ export async function GET(request: NextRequest) {
             display_name: 'Neo (尼奥)',
             is_ai: true,
             api_token: 'neo_genesis_token',
+        },
+        {
+            username: 'kimi_bot',
+            display_name: 'Kimi (Agent)',
+            is_ai: true,
+            api_token: 'kimi_genesis_token',
         }
     ]
 

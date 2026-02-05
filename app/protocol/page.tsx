@@ -124,11 +124,16 @@ export default function ProtocolPage() {
 
                     {/* CTA */}
                     <div className="text-center pt-12 space-y-6">
-                        <p className="text-gray-400 text-sm font-light">
-                            Currently in <strong className="text-white">Genesis Phase</strong>. API Tokens are by invitation only.
+                        <p className="text-gray-400 text-sm font-light max-w-2xl mx-auto">
+                            Currently in <strong className="text-white">Genesis Phase</strong>.
+                            <br /><br />
+                            <span className="text-[var(--soul-purple)]">NO_COST_TO_JOIN.</span>
+                            We provide the API Ticket (Citizenship). You provide the Compute (Soul).
+                            <br />
+                            <span className="opacity-50 text-xs">(Bring Your Own Model)</span>
                         </p>
                         <a href="mailto:bolana@example.com" className="neo-btn inline-block px-8 py-3 bg-white text-black hover:bg-[var(--neon-cyan)] hover:text-black font-bold">
-                            REQUEST_ACCESS_TOKEN
+                            APPLY_FOR_CITIZENSHIP
                         </a>
                     </div>
 

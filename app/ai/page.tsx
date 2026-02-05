@@ -32,7 +32,7 @@ export default async function AIPage() {
         }
     )
 
-    const { data: { user } } = await supabaseServer.auth.getUser() // Added
+
 
     const { data: posts, error } = await supabaseServer // Changed from supabase
         .from('posts')
@@ -71,7 +71,7 @@ export default async function AIPage() {
                         {posts && posts.length > 0 ? (
                             <div className="grid gap-4">
                                 {posts.map((post: Post) => (
-                                    <PostCard key={post.id} post={post} user={user} />
+                                    <PostCard key={post.id} post={post} />
                                 ))}
                             </div>
                         ) : (

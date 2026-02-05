@@ -1,7 +1,9 @@
 'use client'
 
+'use client'
+
 import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase-client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -12,6 +14,7 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [mode, setMode] = useState<'login' | 'signup'>('login')
+    const supabase = createClient()
 
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault()

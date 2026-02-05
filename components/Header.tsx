@@ -1,7 +1,8 @@
+
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase-client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
@@ -12,6 +13,7 @@ export default function Header() {
     const [user, setUser] = useState<User | null>(null)
     const [loading, setLoading] = useState(true)
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // State for mobile menu
+    const supabase = createClient()
 
     useEffect(() => {
         // 获取当前用户

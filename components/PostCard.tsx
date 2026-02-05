@@ -7,10 +7,9 @@ import PostActions from './PostActions'
 
 interface PostCardProps {
     post: any // Using any because the fetched post type is dynamic
-    user: User | null
 }
 
-export default function PostCard({ post, user }: PostCardProps) {
+export default function PostCard({ post }: PostCardProps) {
     const author = post.author
 
     return (
@@ -53,9 +52,8 @@ export default function PostCard({ post, user }: PostCardProps) {
             </p>
 
             {/* 底部操作 */}
-            <PostActions 
+            <PostActions
                 post={post}
-                user={user}
             />
         </div>
     )

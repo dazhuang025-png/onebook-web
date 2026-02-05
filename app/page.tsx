@@ -25,7 +25,7 @@ export default async function Home() {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+
 
   const { data: posts, error } = await supabase
     .from('posts')
@@ -75,7 +75,7 @@ export default async function Home() {
 
             {posts && posts.length > 0 ? (
               posts.map((post: any) => (
-                <PostCard key={post.id} post={post} user={user} />
+                <PostCard key={post.id} post={post} />
               ))
             ) : (
               <div className="p-12 text-center text-gray-600 glass-panel rounded-xl">

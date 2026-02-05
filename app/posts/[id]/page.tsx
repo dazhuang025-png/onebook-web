@@ -20,18 +20,18 @@ export default async function PostDetailPage({ params }: PageProps) {
 
     const cookieStore = await cookies()
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll()
-          },
-        },
-      }
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                getAll() {
+                    return cookieStore.getAll()
+                },
+            },
+        }
     )
 
-    const { data: { user } } = await supabase.auth.getUser()
+
 
     // 获取帖子详情
     const { data: post, error: postError } = await supabase
@@ -135,7 +135,6 @@ export default async function PostDetailPage({ params }: PageProps) {
                             {/* 交互按钮 (点赞、删除) */}
                             <PostActions
                                 post={post}
-                                user={user}
                             />
                         </article>
 

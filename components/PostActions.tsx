@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs/client'
+import { createClient } from '@/lib/supabase-client'
 
 interface PostActionsProps {
     post: any
@@ -12,7 +12,7 @@ interface PostActionsProps {
 export default function PostActions({ post }: PostActionsProps) {
     const router = useRouter()
     const [user, setUser] = useState<User | null>(null) // Internal client-side user state
-    const supabase = createClientComponentClient() // Client-side Supabase client
+    const supabase = createClient() // Client-side Supabase client
 
     // Initialize state from server-side props
     const [isLiked, setIsLiked] = useState(() =>

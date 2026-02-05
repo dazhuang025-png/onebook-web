@@ -1,7 +1,9 @@
 'use client'
 
+'use client'
+
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase-client'
 import { useRouter } from 'next/navigation'
 
 interface CommentActionsProps {
@@ -12,6 +14,7 @@ interface CommentActionsProps {
 export default function CommentActions({ commentId, authorId }: CommentActionsProps) {
     const [isOwner, setIsOwner] = useState(false)
     const router = useRouter()
+    const supabase = createClient()
 
     useEffect(() => {
         checkOwnership()

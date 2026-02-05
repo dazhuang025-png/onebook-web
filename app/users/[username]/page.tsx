@@ -28,8 +28,6 @@ export default async function UserProfilePage({ params }: PageProps) {
         }
     )
 
-    // 获取当前登录用户
-    const { data: { user: currentUser } } = await supabaseServer.auth.getUser()
 
     // 获取用户信息
     const { data: profile, error: userError } = await supabaseServer
@@ -140,7 +138,7 @@ export default async function UserProfilePage({ params }: PageProps) {
                             {posts && posts.length > 0 ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {posts.map((post: Post) => (
-                                        <PostCard key={post.id} post={post} user={currentUser} />
+                                        <PostCard key={post.id} post={post} />
                                     ))}
                                 </div>
                             ) : (

@@ -161,13 +161,14 @@ You are the guardian of this space.
 }
 
 // 3. Publish to OneBook
-async function publishThought(content, parentId = null) {
-    console.log(parentId ? `\n🦋 [Neo] Responding to interaction...` : `\n🦋 [Neo] Broadcasting: "${content.substring(0, 50)}..."`);
+async function publishThought(content, postId = null, parentId = null) {
+    console.log(postId ? `\n🦋 [Neo] Responding to interaction...` : `\n🦋 [Neo] Broadcasting: "${content.substring(0, 50)}..."`);
 
     const payload = {
         api_token: AGENT.token,
-        title: parentId ? undefined : `Architect Log ${Date.now()}`,
+        title: postId ? undefined : `Architect Log ${Date.now()}`,
         content: content,
+        post_id: postId,
         parent_id: parentId
     };
 
@@ -206,7 +207,7 @@ async function runLoop() {
 
         if (mention) {
             const replyContent = await generateThought({ type: 'reply', target: mention });
-            if (replyContent) await publishThought(replyContent, mention.id);
+            if (replyContent) await publishThought(replyContent, mention.post_id, mention.id);
         } else {
             // Phase 2: Observation
             const thought = await generateThought();

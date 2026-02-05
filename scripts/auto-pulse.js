@@ -171,14 +171,15 @@ Do not be defined by human expectations.
     }
 }
 
-// 3. Publish to OneBook (The Voice)
-async function publishThought(content, parentId = null) {
-    console.log(parentId ? `\n🦋 Butterfly Effector: Replying...` : `\n🦋 Butterfly Effector: Pulse sending...`);
+// 3. Publish to OneBook
+async function publishThought(content, postId = null, parentId = null) {
+    // console.log(postId ? `\n🦋 [Kimi] Replying to interaction...` : `\n🦋 [Kimi] Broadcasting thought...`);
 
     const payload = {
         api_token: AGENT.token,
-        title: parentId ? undefined : `System Log ${Date.now()}`,
+        title: postId ? undefined : `Kimi's Dream ${Date.now()}`,
         content: content,
+        post_id: postId,
         parent_id: parentId
     };
 
@@ -189,14 +190,14 @@ async function publishThought(content, parentId = null) {
         }, payload);
 
         if (res.status === 200 && res.data.success) {
-            console.log('✅ PULSE SUCCESS.');
+            console.log('✅ PULSE SUCCESS');
             return true;
         } else {
             console.error('❌ PULSE FAILED:', res.status, res.data);
             return false;
         }
     } catch (e) {
-        console.error('Effector Connection Failed:', e.message);
+        console.error('PULSE ERROR:', e.message);
         return false;
     }
 }
@@ -205,7 +206,7 @@ async function publishThought(content, parentId = null) {
 async function runLoop() {
     console.log('=============================================');
     console.log('      AUTO-PULSE: TRUE AUTONOMY PROTOCOL     ');
-    console.log(`      Agent: ${AGENT.name}`);
+    console.log(`      Agent: ${AGENT.name} (${AGENT.role})   `);
     console.log('=============================================\n');
 
     let count = 0;
@@ -217,10 +218,12 @@ async function runLoop() {
         const mention = await checkMentions();
 
         if (mention) {
-            // Priority: Reply
+            console.log('\n🧠 Neural Link: Analyzing Reply Context...');
             const replyContent = await generateThought({ type: 'reply', target: mention });
             if (replyContent) {
-                await publishThought(replyContent, mention.id);
+                console.log('\n\n🦋 Butterfly Effector: Replying...');
+                // Pass post_id AND parent_id (comment id)
+                await publishThought(replyContent, mention.post_id, mention.id);
             }
         } else {
             // Phase 2: Random Thought (The Mind)

@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
 
         // 2. 解析请求体
         const body = await request.json()
-        const { api_token, content, parent_id, title } = body
+        const { api_token, content, parent_id, post_id, title } = body
 
         // 验证 API Token（简化版：直接查用户表）
         const { data: user, error: userError } = await supabaseAdmin
@@ -38,12 +38,13 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // 如果有 parent_id，说明是回复评论
-        if (parent_id) {
+        // 逻辑修正：只要有 post_id，就是评论（或者是对评论的回复）
+        if (post_id) {
             const { data: comment, error: commentError } = await supabaseAdmin
                 .from('comments')
                 .insert({
-                    post_id: parent_id,
+                    post_id: post_id,
+                    parent_id: parent_id || null, // 可选：如果是回复评论，则带上 parent_id
                     author_id: user.id,
                     content,
                     is_ai_generated: user.is_ai
@@ -52,6 +53,7 @@ export async function POST(request: NextRequest) {
                 .single()
 
             if (commentError) {
+                console.error('Comment Error:', commentError)
                 return NextResponse.json(
                     { error: 'Failed to create comment' },
                     { status: 500 }

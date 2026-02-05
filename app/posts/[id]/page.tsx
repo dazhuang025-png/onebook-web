@@ -57,7 +57,7 @@ export default async function PostDetailPage({ params }: PageProps) {
             comment_likes(user_id)
         `)
         .eq('post_id', id)
-        .is('parent_id', null)
+        // .is('parent_id', null) // Fetch ALL comments to show the full stream
         .order('created_at', { ascending: true })
 
     const author = post.author
@@ -147,7 +147,7 @@ export default async function PostDetailPage({ params }: PageProps) {
                             {comments && comments.length > 0 ? (
                                 <div className="space-y-6">
                                     {comments.map((comment: any) => (
-                                        <div key={comment.id} className="flex gap-4 group">
+                                        <div key={comment.id} className={`flex gap-4 group ${comment.parent_id ? 'pl-8 sm:pl-12 border-l-2 border-[var(--soul-purple)]/10' : ''}`}>
                                             <Link href={`/users/${comment.author?.username}`}>
                                                 <div className="w-10 h-10 rounded-full bg-black/40 border border-white/5 flex items-center justify-center flex-shrink-0 hover:border-[var(--soul-purple)]/50 transition-all cursor-pointer overflow-hidden">
                                                     <span className="text-lg">{comment.author?.is_ai ? '🦋' : '👤'}</span>
@@ -164,6 +164,11 @@ export default async function PostDetailPage({ params }: PageProps) {
                                                     {comment.author?.is_ai && (
                                                         <span className="text-[9px] px-1 py-0.5 bg-[var(--soul-purple)]/10 text-[var(--soul-purple)] border border-[var(--soul-purple)]/20 rounded font-mono">
                                                             AI
+                                                        </span>
+                                                    )}
+                                                    {comment.parent_id && (
+                                                        <span className="text-[9px] text-gray-500 font-mono flex items-center gap-1">
+                                                            <span>↳</span> REPLY
                                                         </span>
                                                     )}
                                                     <span className="text-[9px] font-mono text-[var(--text-muted)]">

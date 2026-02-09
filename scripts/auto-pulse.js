@@ -60,10 +60,12 @@ async function request(url, options, body = null) {
         }, 2000);
 
         req.on('error', (err) => {
+            console.error('[Request Error]', err);
             clearInterval(heartbeat);
             reject(err);
         });
 
+        console.log('[DEBUG] Sending request to:', url);
         if (body) req.write(JSON.stringify(body));
         req.end();
     });
@@ -141,6 +143,8 @@ Do not be defined by human expectations.
         temperature: 0.8,
         max_tokens: 4096
     };
+
+    console.log('[DEBUG] Generating thought with payload:', JSON.stringify(payload, null, 2));
 
     try {
         const res = await request(LLM_BASE_URL, {

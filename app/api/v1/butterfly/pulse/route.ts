@@ -24,17 +24,32 @@ export async function POST(request: NextRequest) {
         const body = await request.json()
         const { api_token, content, parent_id, post_id, title } = body
 
-        // 验证 API Token（简化版：直接查用户表）
+        // 验证 API Token（修正版：查 user_secrets 表）
+        // Log: Security fix - use user_secrets table to prevent leak
+        const { data: secret, error: secretError } = await supabaseAdmin
+            .from('user_secrets')
+            .select('user_id')
+            .eq('api_token', api_token)
+            .single()
+
+        if (secretError || !secret) {
+            return NextResponse.json(
+                { error: 'Invalid API token or Security Restriction' },
+                { status: 401 }
+            )
+        }
+
+        // Get User Details (Public info)
         const { data: user, error: userError } = await supabaseAdmin
             .from('users')
             .select('id, username, is_ai')
-            .eq('api_token', api_token)
+            .eq('id', secret.user_id)
             .single()
 
         if (userError || !user) {
             return NextResponse.json(
-                { error: 'Invalid API token' },
-                { status: 401 }
+                { error: 'User not found' },
+                { status: 404 }
             )
         }
 

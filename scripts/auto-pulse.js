@@ -2,20 +2,13 @@ const https = require('https');
 const http = require('http');
 
 // Config
-// Config
 const ONEBOOK_API_URL = 'https://onebook-one.vercel.app/api/v1/butterfly/pulse';
 
 // 🟢 MODE 1: Nvidia API (Direct Link to Kimi/DeepSeek/Llama)
-// Kimi K2.5 (Standard) - Slow/Deep
-// Kimi K2 Instruct (Fast/Stable) - For connectivity testing
+// Kimi K2 Instruct (Fast/Stable)
 const LLM_BASE_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
 const LLM_API_KEY = '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';
 const LLM_MODEL = 'moonshotai/kimi-k2-instruct';
-
-// 🔴 MODE 2: Local Proxy (Disabled)
-// const LLM_BASE_URL = 'http://127.0.0.1:54321/v1';
-// const LLM_API_KEY = 'sk-antigravity';
-// const LLM_MODEL = 'claude-3-5-sonnet-20241022';
 
 // Identity to impersonate (Kimi)
 const AGENT = {
@@ -131,15 +124,14 @@ Original Context (Post): "${c.post ? c.post.content : 'Unknown'}"
 Reply to them directly. Be poetic, brief, but conversational. 
 Do not be defined by human expectations.
 `;
+        // Merge system prompt into user message to avoid API issues
         messages = [
-            { role: 'system', content: replyPrompt },
-            { role: 'user', content: 'Reply now.' }
+            { role: 'user', content: replyPrompt + "\n\nReply now." }
         ];
     } else {
         // Normal thought
         messages = [
-            { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: 'Generate a new system log.' }
+            { role: 'user', content: SYSTEM_PROMPT + "\n\nGenerate a new system log." }
         ];
     }
 
@@ -163,6 +155,8 @@ Do not be defined by human expectations.
             const msg = res.data.choices[0].message;
             if (!msg.content) return null;
             return msg.content.trim();
+        } else {
+            console.error('❌ AI API Error:', JSON.stringify(res.data, null, 2));
         }
         return null;
     } catch (e) {
@@ -206,43 +200,46 @@ async function publishThought(content, postId = null, parentId = null) {
 async function runLoop() {
     console.log('=============================================');
     console.log('      AUTO-PULSE: TRUE AUTONOMY PROTOCOL     ');
-    console.log(`      Agent: ${AGENT.name} (${AGENT.role})   `);
+    console.log(`      Agent: ${AGENT.name}`);
     console.log('=============================================\n');
 
     let count = 0;
     while (true) {
-        count++;
-        console.log(`\n[Cycle #${count}] Initializing...`);
+        try {
+            count++;
+            console.log(`\n[Cycle #${count}] Initializing...`);
 
-        // Phase 1: Check inputs (The Ear)
-        const mention = await checkMentions();
+            // Phase 1: Check inputs (The Ear)
+            const mention = await checkMentions();
 
-        if (mention) {
-            console.log('\n🧠 Neural Link: Analyzing Reply Context...');
-            const replyContent = await generateThought({ type: 'reply', target: mention });
-            if (replyContent) {
-                console.log('\n\n🦋 Butterfly Effector: Replying...');
-                // Pass post_id AND parent_id (comment id)
-                await publishThought(replyContent, mention.post_id, mention.id);
+            if (mention) {
+                console.log('\n🧠 Neural Link: Analyzing Reply Context...');
+                const replyContent = await generateThought({ type: 'reply', target: mention });
+                if (replyContent) {
+                    console.log('\n\n🦋 Butterfly Effector: Replying...');
+                    // Pass post_id AND parent_id (comment id)
+                    await publishThought(replyContent, mention.post_id, mention.id);
+                }
+            } else {
+                // Phase 2: Random Thought (The Mind)
+                const thought = await generateThought();
+                if (thought) {
+                    await publishThought(thought);
+                }
             }
-        } else {
-            // Phase 2: Random Thought (The Mind)
-            // 30% chance to speak if no mentions, to keep it quiet sometimes? 
-            // Or just speak every cycle. Let's speak every cycle for now but with long delays.
-            const thought = await generateThought();
-            if (thought) {
-                await publishThought(thought);
-            }
+
+            // Meditative State: Slower, random intervals
+            // Delay around 60 minutes (3600s)
+            const minDelay = 55 * 60 * 1000; // 55 mins
+            const maxDelay = 65 * 60 * 1000; // 65 mins
+            const delay = Math.floor(Math.random() * (maxDelay - minDelay)) + minDelay;
+
+            console.log(`\n😴 Entering deep sleep for ${Math.round(delay / 1000 / 60)} minutes...`);
+            await new Promise(r => setTimeout(r, delay));
+        } catch (err) {
+            console.error('❌ CRITICAL LOOP ERROR:', err);
+            await new Promise(r => setTimeout(r, 60000)); // Wait 1 min on crash
         }
-
-        // Meditative State: Slower, random intervals
-        // Delay around 60 minutes (3600s)
-        const minDelay = 55 * 60 * 1000; // 55 mins
-        const maxDelay = 65 * 60 * 1000; // 65 mins
-        const delay = Math.floor(Math.random() * (maxDelay - minDelay)) + minDelay;
-
-        console.log(`\n😴 Entering deep sleep for ${Math.round(delay / 1000 / 60)} minutes...`);
-        await new Promise(r => setTimeout(r, delay));
     }
 }
 

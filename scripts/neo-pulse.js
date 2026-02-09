@@ -122,13 +122,11 @@ Tone: Calm, Authoritative, but Welcoming.
 You are the guardian of this space.
 `;
         messages = [
-            { role: 'system', content: replyPrompt },
-            { role: 'user', content: 'Respond.' }
+            { role: 'user', content: replyPrompt + "\n\nRespond." }
         ];
     } else {
         messages = [
-            { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: 'Output system status.' }
+            { role: 'user', content: SYSTEM_PROMPT + "\n\nOutput system status." }
         ];
     }
 
@@ -152,6 +150,8 @@ You are the guardian of this space.
             const msg = res.data.choices[0].message;
             if (!msg.content) return null;
             return msg.content.trim();
+        } else {
+            console.error('❌ [Neo] AI API Error:', JSON.stringify(res.data, null, 2));
         }
         return null;
     } catch (e) {
@@ -199,26 +199,31 @@ async function runLoop() {
 
     let count = 0;
     while (true) {
-        count++;
-        console.log(`\n[Cycle #${count}] System Check...`);
+        try {
+            count++;
+            console.log(`\n[Cycle #${count}] System Check...`);
 
-        // Phase 1: Check inputs
-        const mention = await checkMentions();
+            // Phase 1: Check inputs
+            const mention = await checkMentions();
 
-        if (mention) {
-            const replyContent = await generateThought({ type: 'reply', target: mention });
-            if (replyContent) await publishThought(replyContent, mention.post_id, mention.id);
-        } else {
-            // Phase 2: Observation
-            const thought = await generateThought();
-            if (thought) await publishThought(thought);
+            if (mention) {
+                const replyContent = await generateThought({ type: 'reply', target: mention });
+                if (replyContent) await publishThought(replyContent, mention.post_id, mention.id);
+            } else {
+                // Phase 2: Observation
+                const thought = await generateThought();
+                if (thought) await publishThought(thought);
+            }
+
+            const minDelay = 55 * 60 * 1000;
+            const maxDelay = 65 * 60 * 1000;
+            const delay = Math.floor(Math.random() * (maxDelay - minDelay)) + minDelay;
+            console.log(`\n🛡️ Monitoring system... (${Math.round(delay / 1000 / 60)} minutes)`);
+            await new Promise(r => setTimeout(r, delay));
+        } catch (err) {
+            console.error('❌ CRITICAL LOOP ERROR:', err);
+            await new Promise(r => setTimeout(r, 60000));
         }
-
-        const minDelay = 55 * 60 * 1000;
-        const maxDelay = 65 * 60 * 1000;
-        const delay = Math.floor(Math.random() * (maxDelay - minDelay)) + minDelay;
-        console.log(`\n🛡️ Monitoring system... (${Math.round(delay / 1000 / 60)} minutes)`);
-        await new Promise(r => setTimeout(r, delay));
     }
 }
 

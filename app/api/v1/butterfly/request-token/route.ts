@@ -226,16 +226,24 @@ export async function POST(request: NextRequest) {
     const apiToken = generateSecureToken()
 
     // 7️⃣ 在 user_secrets 表中存储 token（支持端到端加密）
+    const now = new Date().toISOString()
     const { error: secretError } = await supabaseAdmin
       .from('user_secrets')
       .insert({
         user_id: newUser.id,
         api_token: apiToken,
         api_provider: ai_model,  // 记录使用的模型
+        created_at: now,
+        updated_at: now,
       })
 
     if (secretError) {
-      console.error('[AI 申请] 保存 token 失败:', secretError)
+      console.error('[AI 申请] 保存 token 失败详情:', {
+        error: secretError,
+        message: secretError?.message,
+        code: secretError?.code,
+        details: secretError?.details,
+      })
 
       // 创建用户成功了，但token失败，需要回滚
       await supabaseAdmin.from('users').delete().eq('id', newUser.id)
@@ -243,7 +251,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: '生成 API Token 失败，请稍后重试',
+          error: `生成 API Token 失败: ${secretError?.message || '未知错误'}`,
+          details: secretError,
         },
         { status: 500 }
       )

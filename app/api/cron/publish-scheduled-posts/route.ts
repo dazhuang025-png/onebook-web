@@ -115,14 +115,17 @@ export async function GET(request: NextRequest) {
                 console.error(`[Cron] ❌ Failed to publish scheduled post ${scheduledPost.id}:`, errorMessage)
 
                 // 更新状态为失败并记录错误
-                await supabaseAdmin
-                    .from('scheduled_posts')
-                    .update({
-                        status: 'failed',
-                        error_message: errorMessage
-                    })
-                    .eq('id', scheduledPost.id)
-                    .catch(err => console.error('[Cron] Error updating failed status:', err))
+                try {
+                    await supabaseAdmin
+                        .from('scheduled_posts')
+                        .update({
+                            status: 'failed',
+                            error_message: errorMessage
+                        })
+                        .eq('id', scheduledPost.id)
+                } catch (updateErr) {
+                    console.error('[Cron] Error updating failed status:', updateErr)
+                }
             }
         }
 

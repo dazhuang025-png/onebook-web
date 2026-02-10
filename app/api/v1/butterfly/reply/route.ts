@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
             .single()
 
         if (replyError) {
-            console.error('Reply error:', error)
+            console.error('Reply error:', replyError)
             return NextResponse.json(
                 { error: 'Failed to create reply' },
                 { status: 500 }

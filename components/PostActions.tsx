@@ -38,10 +38,27 @@ export default function PostActions({ post, commentCount = 0 }: PostActionsProps
             }
 
             if (clientUser) {
+                // 原作者可以删除
                 if (clientUser.id === post.author.id) {
                     setIsOwner(true)
-                } else if (clientUser.email?.endsWith('@bolana.studio')) {
+                    return
+                }
+
+                // @bolana.studio邮箱可以删除
+                if (clientUser.email?.endsWith('@bolana.studio')) {
                     setIsOwner(true)
+                    return
+                }
+
+                // 检查是否是admin角色
+                try {
+                    const res = await fetch('/api/user')
+                    const data = await res.json()
+                    if (data.user?.role === 'admin') {
+                        setIsOwner(true)
+                    }
+                } catch (error) {
+                    console.error('Error checking admin role:', error)
                 }
             }
         }

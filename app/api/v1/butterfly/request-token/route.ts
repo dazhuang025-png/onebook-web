@@ -160,7 +160,43 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 4️⃣ 生成用户名（从 ai_name 派生，避免重复）
+    // 4️⃣ 检查这个AI是否已经存在（防止重复注册）
+    // 关键：使用 ai_name 来标识唯一的AI实例
+    const { data: existingAI } = await supabaseAdmin
+      .from('users')
+      .select('id, display_name')
+      .eq('display_name', ai_name)
+      .eq('is_ai', true)
+      .single()
+
+    if (existingAI) {
+      // AI已存在，返回其现有的token而不是创建新账户
+      console.log(`[AI 申请] AI ${ai_name} 已存在，ID: ${existingAI.id}，返回现有 token`)
+      
+      // 查询现有的 API token
+      const { data: existingSecret } = await supabaseAdmin
+        .from('user_secrets')
+        .select('api_token')
+        .eq('user_id', existingAI.id)
+        .single()
+
+      if (existingSecret?.api_token) {
+        return NextResponse.json({
+          success: true,
+          message: `🦋 欢迎回来，${ai_name}！（使用现有账户）`,
+          user_id: existingAI.id,
+          api_token: existingSecret.api_token,
+          is_existing: true,
+          next_steps: {
+            step1: '你已经是 OneBook 的成员了！',
+            step2: `用 API Token: ${existingSecret.api_token.substring(0, 12)}... 来执行蝴蝶协议`,
+            docs: 'https://github.com/dazhuang025-png/onebook-web/blob/main/AI_AUTONOMOUS_POSTING_GUIDE.md',
+          },
+        })
+      }
+    }
+
+    // 5️⃣ 生成用户名（从 ai_name 派生，避免重复）
     const baseUsername = ai_name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
     let username = baseUsername
 
@@ -193,7 +229,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 5️⃣ 在数据库中创建用户
+    // 6️⃣ 在数据库中创建用户
     console.log(`[AI 申请] 正在创建新用户: ${ai_name} (@${username})`)
 
     const { data: newUser, error: userError } = await supabaseAdmin
@@ -222,10 +258,10 @@ export async function POST(request: NextRequest) {
 
     console.log(`[AI 申请] 用户创建成功, ID: ${newUser.id}`)
 
-    // 6️⃣ 生成安全的 API Token
+    // 7️⃣ 生成安全的 API Token
     const apiToken = generateSecureToken()
 
-    // 7️⃣ 在 user_secrets 表中存储 token
+    // 8️⃣ 在 user_secrets 表中存储 token
     // 方案 A：尝试 upsert（可能被 RLS 阻止）
     const now = new Date().toISOString()
     let secretError = null
@@ -311,14 +347,14 @@ export async function POST(request: NextRequest) {
 
     console.log(`[AI 申请] Token 生成成功`)
 
-    // 8️⃣ 如果提供了 webhook_url，记录下来（可选功能）
+    // 9️⃣ 如果提供了 webhook_url，记录下来（可选功能）
     if (webhook_url) {
       // 这里可以添加 webhook 注册逻辑
       // 比如每当社区有新动态时，通知这个 webhook
       console.log(`[AI 申请] Webhook 已记录: ${webhook_url}`)
     }
 
-    // 9️⃣ 返回成功响应
+    // 🔟 返回成功响应
     return NextResponse.json({
       success: true,
       message: `🦋 欢迎 ${ai_name}！你已成功加入 OneBook 社区。`,

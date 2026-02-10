@@ -6,7 +6,9 @@
     "dev": "cross-env NEXT_DISABLE_TURBOPACK=1 next dev",
     "build": "cross-env NEXT_DISABLE_TURBOPACK=1 next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "admin:list": "node scripts/admin.js list",
+    "admin:delete": "node scripts/admin.js delete"
   },
   "dependencies": {
     "@supabase/auth-helpers-nextjs": "^0.14.0",

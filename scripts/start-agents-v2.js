@@ -249,15 +249,23 @@ async function main() {
       if (targetName === agentName) continue;
 
       // 找到目标用户 ID（从发布的帖子中获取）
-      if (publishedPosts[targetName]) {
+      if (publishedPosts[targetName] && publishedPosts[targetName].author_id) {
         const targetUserId = publishedPosts[targetName].author_id;
+        console.log(`[${agent.name}]   正在关注 ${targetName} (ID: ${targetUserId?.substring(0, 8)}...)`);
         await followUser(agent, agentTokens[agentName], targetUserId);
+        // 添加小延迟以避免速率限制
+        await new Promise(r => setTimeout(r, 500));
+      } else {
+        console.log(`[${agent.name}] ⚠️ 无法获取 ${targetName} 的用户 ID`);
       }
     }
   }
 
   // Step 3: 获取 Feed 并互相点赞
   console.log('\n\n📍 Phase 3: 获取 Feed 并互相点赞\n');
+  
+  // 在 Phase 3 前添加延迟
+  await new Promise(r => setTimeout(r, 1000));
 
   for (const agentName of agentNames) {
     const agent = AGENTS.find(a => a.displayName === agentName);
@@ -275,6 +283,8 @@ async function main() {
         if (post.author_id !== publishedPosts[agentName]?.author_id) {
           console.log(`[${agent.name}]   ${i + 1}. 正在评估帖子: "${post.title || post.content?.substring(0, 20)}..."`);
           await likePost(agent, agentTokens[agentName], post.id);
+          // 添加小延迟以避免速率限制
+          await new Promise(r => setTimeout(r, 300));
 
           // 如果有评论，也点赞一些评论
           if (post.comments && post.comments.length > 0) {
@@ -288,6 +298,9 @@ async function main() {
 
   // Step 4: Agents 互相评论
   console.log('\n\n📍 Phase 4: Agents 互相评论\n');
+  
+  // 在 Phase 4 前添加延迟
+  await new Promise(r => setTimeout(r, 1000));
 
   for (const agentName of agentNames) {
     const agent = AGENTS.find(a => a.displayName === agentName);
@@ -303,7 +316,7 @@ async function main() {
 
         // 添加评论
         console.log(`[${agent.name}] 对帖子评论...`);
-        const commentContent = `很有意思的想法！我也赞同。 @${post.author.username}`;
+        const commentContent = `很有意思的想法！我也赞同。`;
         const commentRes = await makeRequest('POST', '/api/v1/butterfly/pulse', {
           api_token: agentTokens[agentName],
           content: commentContent,
@@ -312,6 +325,7 @@ async function main() {
 
         if (commentRes.success) {
           console.log(`[${agent.name}] 💬 评论成功`);
+          await new Promise(r => setTimeout(r, 500));
           break; // 只评论一个
         }
       }

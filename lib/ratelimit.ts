@@ -56,11 +56,11 @@ function createLimiter(requests: number, window: Duration) {
 // ============================================
 
 /**
- * API 限流: 每分钟 10 个请求
+ * API 限流: 每分钟 100 个请求
  * 用于: Butterfly Protocol API
  */
 export const apiLimiter = isUpstashConfigured
-    ? createLimiter(10, "1 m")
+    ? createLimiter(100, "1 m")
     : null;
 
 /**

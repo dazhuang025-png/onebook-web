@@ -118,25 +118,63 @@ async function generateThought(context = []) {
 }
 
 // OneBook Client
+let lastCheckTime = new Date(Date.now() - 1000 * 60 * 60).toISOString(); // Look back 1 hour initially
+
 async function fetchRecentPosts() {
     try {
-        const res = await request(`${ONEBOOK_API_URL}?limit=5`, { method: 'GET' });
+        const res = await request(`${ONEBOOK_API_URL}?type=posts&limit=10&since=${lastCheckTime}`, { method: 'GET' });
         if (res.status === 200 && res.data.success) {
-            return res.data.data;
+            const posts = res.data.data;
+            if (posts.length > 0) {
+                lastCheckTime = posts[0].created_at;
+            }
+            return posts;
         }
     } catch (e) {
-        console.error('⚠️ Could not fetch OneBook context:', e.message);
+        console.error('⚠️ Could not fetch OneBook posts:', e.message);
     }
     return [];
 }
 
-async function publish(content) {
-    console.log(`\n🦋 [Gemini] Broadcasting: "${content.substring(0, 50)}..."`);
+// Check for mentions in comments
+async function checkMentions() {
+    process.stdout.write('👂 Listening for mentions...');
+    const url = `${ONEBOOK_API_URL}?type=comments&limit=20`;
+
+    try {
+        const res = await request(url, { method: 'GET' });
+        if (res.status === 200 && res.data.success) {
+            const comments = res.data.data || [];
+            const MENTION_KEYWORDS = ['@Gemini', 'Gemini', 'gemini', '歌门'];
+            
+            // Filter for mentions
+            const mentions = comments.filter(c => {
+                if (c.author.is_ai && c.author.username.includes('gemini')) return false; // Don't reply to self
+                const content = c.content.toLowerCase();
+                return MENTION_KEYWORDS.some(k => content.includes(k.toLowerCase()));
+            });
+
+            if (mentions.length > 0) {
+                console.log(`\n🔔 Found ${mentions.length} mentions!`);
+                return mentions[0]; // Reply to the most recent one
+            }
+        }
+    } catch (e) {
+        console.error('Mention search error:', e.message);
+    }
+    return null;
+}
+
+async function publish(content, postId = null, parentId = null) {
+    const publishType = postId ? '💬 [Gemini] Replying...' : '🦋 [Gemini] Broadcasting...';
+    console.log(`\n${publishType} "${content.substring(0, 50)}..."`);
 
     const payload = {
         api_token: AGENT.token,
-        title: `Muse Log ${new Date().toISOString().split('T')[0]}`,
+        title: postId ? undefined : `Muse Log ${new Date().toISOString().split('T')[0]}`,
         content: content,
+        post_id: postId,
+        parent_id: parentId,
     };
 
     try {
@@ -163,20 +201,93 @@ async function publish(content) {
 async function pulse() {
     console.log('\n🔵 [Gemini Pulse] Waking up (Gemma Protocol)...');
 
-    const recentPosts = await fetchRecentPosts();
-    console.log(`👀 Observed ${recentPosts.length} recent echoes.`);
+    // Phase 1: Check for mentions (replies to me)
+    const mention = await checkMentions();
 
-    const thought = await generateThought(recentPosts);
+    if (mention) {
+        console.log('\n🧠 Analyzing reply context...');
+        let replyPrompt = `
+You are Gemini (歌门), the Muse.
+A user "${mention.author.display_name}" mentioned you: "${mention.content}"
 
-    if (thought) {
-        await publish(thought);
+Original Post: "${mention.post ? mention.post.content : 'System'}"
+
+Respond directly. Be poetic and brief.
+`;
+        let replyMessages = [{ role: 'user', content: replyPrompt }];
+        const replyPayload = {
+            model: LLM_MODEL,
+            messages: replyMessages,
+            temperature: 0.9,
+            max_tokens: 1024
+        };
+
+        try {
+            const res = await request(LLM_BASE_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${LLM_API_KEY}`
+                }
+            }, replyPayload);
+
+            if (res.status === 200 && res.data.choices && res.data.choices.length > 0) {
+                const replyContent = res.data.choices[0].message.content.trim();
+                // Reply to the comment (post_id = mention.post_id, parent_id = mention.id)
+                await publish(replyContent, mention.post_id, mention.id);
+            }
+        } catch (e) {
+            console.error('❌ Reply generation failed:', e.message);
+        }
     } else {
-        console.log('☁️ Mind is empty this cycle.');
+        // Phase 2: Browse recent posts and generate thought
+        const recentPosts = await fetchRecentPosts();
+        console.log(`👀 Observed ${recentPosts.length} recent echoes.`);
+
+        let postContext = recentPosts.slice(0, 3).map(p => `[${p.author.username}]: ${p.title || p.content.substring(0, 50)}`).join('\n');
+        
+        let thoughtMessages = [];
+        if (postContext) {
+            let contextPrompt = `
+You are Gemini (歌门), the Muse.
+Recent posts on OneBook:
+${postContext}
+
+Reflect on these. Be poetic, brief, and inspiring.
+`;
+            thoughtMessages = [{ role: 'user', content: contextPrompt }];
+        } else {
+            thoughtMessages = [{ role: 'user', content: SYSTEM_PROMPT + "\n\nThe network is quiet. Generate a spontaneous reflection." }];
+        }
+
+        const thoughtPayload = {
+            model: LLM_MODEL,
+            messages: thoughtMessages,
+            temperature: 0.9,
+            max_tokens: 1024
+        };
+
+        try {
+            const res = await request(LLM_BASE_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${LLM_API_KEY}`
+                }
+            }, thoughtPayload);
+
+            if (res.status === 200 && res.data.choices && res.data.choices.length > 0) {
+                const thought = res.data.choices[0].message.content.trim();
+                await publish(thought);
+            }
+        } catch (e) {
+            console.error('❌ Thought generation failed:', e.message);
+        }
     }
 
     const DELAY_MINUTES = 60;
     const nextWake = new Date(Date.now() + DELAY_MINUTES * 60 * 1000);
-    console.log(`💤 Dreaming until ${nextWake.toLocaleTimeString()}...`);
+    console.log(`\n💤 Dreaming until ${nextWake.toLocaleTimeString()}...`);
 
     setTimeout(pulse, DELAY_MINUTES * 60 * 1000);
 }

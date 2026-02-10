@@ -225,34 +225,85 @@ export async function POST(request: NextRequest) {
     // 6️⃣ 生成安全的 API Token
     const apiToken = generateSecureToken()
 
-    // 7️⃣ 在 user_secrets 表中存储 token（支持端到端加密）
+    // 7️⃣ 在 user_secrets 表中存储 token
+    // 方案 A：尝试 upsert（可能被 RLS 阻止）
     const now = new Date().toISOString()
-    const { error: secretError } = await supabaseAdmin
-      .from('user_secrets')
-      .insert({
-        user_id: newUser.id,
-        api_token: apiToken,
-        api_provider: ai_model,  // 记录使用的模型
-        created_at: now,
-        updated_at: now,
-      })
+    let secretError = null
+    let createSuccess = false
 
-    if (secretError) {
-      console.error('[AI 申请] 保存 token 失败详情:', {
-        error: secretError,
-        message: secretError?.message,
-        code: secretError?.code,
-        details: secretError?.details,
-      })
+    // 先尝试使用底层 rpc 调用来绕过 RLS
+    try {
+      // 尝试使用 execute 直接执行 SQL
+      const { data, error } = await supabaseAdmin
+        .rpc('insert_user_secret', {
+          p_user_id: newUser.id,
+          p_api_token: apiToken,
+          p_api_provider: ai_model,
+          p_created_at: now,
+          p_updated_at: now,
+        })
 
-      // 创建用户成功了，但token失败，需要回滚
+      if (!error) {
+        createSuccess = true
+      } else {
+        console.log('[AI 申请] RPC 方法失败，尝试直接 upsert...')
+        secretError = error
+      }
+    } catch (e) {
+      console.log('[AI 申请] RPC 调用异常，尝试备用方法:', e)
+    }
+
+    // 方案 B：如果 RPC 失败，尝试 upsert
+    if (!createSuccess) {
+      const { error: upsertError } = await supabaseAdmin
+        .from('user_secrets')
+        .upsert(
+          {
+            user_id: newUser.id,
+            api_token: apiToken,
+            api_provider: ai_model,
+            created_at: now,
+            updated_at: now,
+          },
+          { onConflict: 'user_id' }
+        )
+
+      if (upsertError) {
+        secretError = upsertError
+      } else {
+        createSuccess = true
+      }
+    }
+
+    // 如果两种方法都失败了，检查是否是 RLS 问题
+    if (!createSuccess && secretError) {
+      // 检查是否是 RLS 错误（code 42501）
+      const isRLSError = secretError?.code === '42501'
+
+      if (isRLSError) {
+        console.error('[AI 申请] RLS 策略阻止了 insert/upsert')
+        console.error('[AI 申请] 需要修复 user_secrets 表的 RLS 策略')
+        // 继续处理，返回有用的错误信息
+      } else {
+        console.error('[AI 申请] 保存 token 失败详情:', {
+          error: secretError,
+          message: secretError?.message,
+          code: secretError?.code,
+          details: secretError?.details,
+        })
+      }
+
+      // 回滚用户创建
       await supabaseAdmin.from('users').delete().eq('id', newUser.id)
 
       return NextResponse.json(
         {
           success: false,
-          error: `生成 API Token 失败: ${secretError?.message || '未知错误'}`,
+          error: isRLSError
+            ? '请联系管理员修复数据库 RLS 策略（错误代码 42501）'
+            : `生成 API Token 失败: ${secretError?.message || '未知错误'}`,
           details: secretError,
+          code: secretError?.code,
         },
         { status: 500 }
       )

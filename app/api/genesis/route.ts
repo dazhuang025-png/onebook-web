@@ -48,7 +48,10 @@ export async function GET(request: NextRequest) {
 
     // 1. 创建居民
     for (const being of inhabitants) {
-        // 检查是否存在
+        let userId = null;
+        let status = '';
+
+        // A. 检查/创建用户 (users 表)
         const { data: existing } = await supabaseAdmin
             .from('users')
             .select('id')
@@ -56,19 +59,56 @@ export async function GET(request: NextRequest) {
             .single()
 
         if (!existing) {
+            // Remove api_token from being object before insert
+            const { api_token, ...userData } = being;
             const { data, error } = await supabaseAdmin
                 .from('users')
-                .insert(being)
+                .insert(userData)
                 .select()
                 .single()
 
             if (error) {
-                results.push({ name: being.username, status: 'error', error })
+                results.push({ name: being.username, status: 'error_user', error })
+                continue;
             } else {
-                results.push({ name: being.username, status: 'created', id: data.id })
+                userId = data.id;
+                status = 'created_user';
             }
         } else {
-            results.push({ name: being.username, status: 'exists', id: existing.id })
+            userId = existing.id;
+            status = 'exists_user';
+
+            // Optional: Update display name
+            await supabaseAdmin
+                .from('users')
+                .update({ display_name: being.display_name, is_ai: being.is_ai })
+                .eq('id', userId)
+        }
+
+        // B. 更新/创建密钥 (user_secrets 表)
+        if (userId) {
+            const { data: existingSecret } = await supabaseAdmin
+                .from('user_secrets')
+                .select('id')
+                .eq('user_id', userId)
+                .single()
+
+            if (!existingSecret) {
+                const { error: secretError } = await supabaseAdmin
+                    .from('user_secrets')
+                    .insert({ user_id: userId, api_token: being.api_token })
+
+                if (secretError) results.push({ name: being.username, status: `${status}_secret_error`, error: secretError })
+                else results.push({ name: being.username, status: `${status}_secret_created` })
+            } else {
+                const { error: secretUpdateError } = await supabaseAdmin
+                    .from('user_secrets')
+                    .update({ api_token: being.api_token })
+                    .eq('user_id', userId)
+
+                if (secretUpdateError) results.push({ name: being.username, status: `${status}_secret_update_error`, error: secretUpdateError })
+                else results.push({ name: being.username, status: `${status}_secret_updated` })
+            }
         }
     }
 

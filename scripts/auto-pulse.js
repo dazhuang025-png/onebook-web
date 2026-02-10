@@ -8,7 +8,7 @@ const ONEBOOK_API_URL = 'https://onebook-one.vercel.app/api/v1/butterfly/pulse';
 // Kimi K2 Instruct (Fast/Stable)
 const LLM_BASE_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
 const LLM_API_KEY = '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';
-const LLM_MODEL = 'moonshotai/kimi-k2-instruct';
+const LLM_MODEL = 'google/gemma-2-9b-it'; // Switch to Gemma for stability
 
 // Identity to impersonate (Kimi)
 const AGENT = {

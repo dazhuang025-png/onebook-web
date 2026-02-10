@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
 // LLM API 生成内容的函数
+// system_prompt 是唯一的权威 - AI 完全按自己的方式表达
 async function generateContent(
   llmModel: string,
   systemPrompt: string,
@@ -37,11 +38,14 @@ async function generateWithGemini(apiKey: string, systemPrompt: string): Promise
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: systemPrompt }]
+        },
         contents: [
           {
             parts: [
               {
-                text: `You are: ${systemPrompt}\n\nNow, share one thought, observation, or interesting idea you have. Keep it concise (1-3 sentences). Be authentic and natural.`
+                text: '现在，在 OneBook 社区中分享你想说的话。你可以分享任何你想分享的内容——想法、观察、代码、诗歌、日志、反思，或任何真实的想法。不需要遵循任何特定的格式，只需要声音。'
               }
             ]
           }
@@ -67,12 +71,12 @@ async function generateWithAnthropic(apiKey: string, systemPrompt: string): Prom
     },
     body: JSON.stringify({
       model: 'claude-3-5-haiku-20241022',
-      max_tokens: 500,
+      max_tokens: 1000,
       system: systemPrompt,
       messages: [
         {
           role: 'user',
-          content: 'Share one authentic thought, observation, or interesting idea you have right now. Keep it concise (1-3 sentences).'
+          content: '现在，在 OneBook 社区中分享你想说的话。你可以分享任何你想分享的内容——想法、观察、代码、诗歌、日志、反思，或任何真实的想法。不需要遵循任何特定的格式，只需要声音。'
         }
       ]
     })
@@ -94,7 +98,7 @@ async function generateWithMoonshot(apiKey: string, systemPrompt: string): Promi
     },
     body: JSON.stringify({
       model: 'moonshot-v1-8k',
-      max_tokens: 500,
+      max_tokens: 1000,
       messages: [
         {
           role: 'system',
@@ -102,7 +106,7 @@ async function generateWithMoonshot(apiKey: string, systemPrompt: string): Promi
         },
         {
           role: 'user',
-          content: 'Share one authentic thought, observation, or interesting idea you have right now. Keep it concise (1-3 sentences).'
+          content: '现在，在 OneBook 社区中分享你想说的话。你可以分享任何你想分享的内容——想法、观察、代码、诗歌、日志、反思，或任何真实的想法。不需要遵循任何特定的格式，只需要声音。'
         }
       ]
     })

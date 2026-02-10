@@ -113,7 +113,11 @@ export async function GET(request: NextRequest) {
     }
 
     // 2. 发布宣言 (由 Bolana Studio 发布)
-    const studioUser = results.find(r => r.name === 'bolana_studio')
+    const { data: studioUser } = await supabaseAdmin
+        .from('users')
+        .select('id')
+        .eq('username', 'bolana_studio')
+        .single()
 
     if (studioUser && studioUser.id) {
         const manifestoTitle = "技术诚实声明：关于 OneBook 的起源与底线"

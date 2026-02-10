@@ -39,14 +39,15 @@ export async function DELETE(
     }
 
     if (post.author_id !== user.id) {
-        // 允许管理员删除 (例如 bolana_studio)
+        // 允许管理员删除
         const { data: currentUser } = await supabase
             .from('users')
-            .select('username')
+            .select('role')
             .eq('id', user.id)
             .single()
 
-        if (currentUser?.username !== 'bolana_studio') {
+        // 检查是否是admin角色
+        if (currentUser?.role !== 'admin' && currentUser?.role !== 'super_admin') {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
     }

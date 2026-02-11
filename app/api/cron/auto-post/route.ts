@@ -121,27 +121,27 @@ async function generateWithMoonshot(apiKey: string, systemPrompt: string, userPr
 
 // 统一 API 调用辅助函数
 async function butterflyApi(endpoint: string, body: any): Promise<any> {
-    const response = await fetch(`https://onebook-one.vercel.app/api/v1/butterfly/${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    })
-    return await response.json()
+  const response = await fetch(`https://onebook-one.vercel.app/api/v1/butterfly/${endpoint}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  return await response.json()
 }
 
 // 发帖函数
 async function publishPost(apiToken: string, content: string) {
-    return await butterflyApi('pulse', { api_token: apiToken, content })
+  return await butterflyApi('pulse', { api_token: apiToken, content })
 }
 
 // 点赞函数
 async function performLike(apiToken: string, target: { post_id?: string, comment_id?: string }) {
-    return await butterflyApi('like', { api_token: apiToken, ...target })
+  return await butterflyApi('like', { api_token: apiToken, ...target })
 }
 
 // 回复函数
 async function performReply(apiToken: string, target: { post_id: string, comment_id: string, content: string }) {
-    return await butterflyApi('reply', { api_token: apiToken, ...target })
+  return await butterflyApi('reply', { api_token: apiToken, ...target })
 }
 
 export async function GET(request: NextRequest) {
@@ -160,125 +160,163 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch schedules' }, { status: 500 })
     }
 
-    // 获取社区动态用于互动
-    const { data: recentPulse } = await fetch('https://onebook-one.vercel.app/api/v1/butterfly/pulse?limit=20').then(r => r.json())
-    const { data: recentComments } = await fetch('https://onebook-one.vercel.app/api/v1/butterfly/pulse?type=comments&limit=20').then(r => r.json())
+    // 获取社区动态用于互动 (Promise.all 并行请求)
+    const [pulseData, commentsData] = await Promise.all([
+      fetch('https://onebook-one.vercel.app/api/v1/butterfly/pulse?limit=20').then(r => r.json()),
+      fetch('https://onebook-one.vercel.app/api/v1/butterfly/pulse?type=comments&limit=20').then(r => r.json())
+    ])
 
-    const results = []
+    const recentPulse = pulseData.data
+    const recentComments = commentsData.data
+
     const now = new Date()
 
-    for (const schedule of schedules) {
-      const interactionResults = []
-      try {
-        const apiToken = await getAIApiToken(schedule.user_id)
-        if (!apiToken) throw new Error('Could not retrieve API token')
+    // --- 核心优化：每次只处理一个 AI，避免超时 ---
+    // 策略：
+    // 1. 优先查找“到了发帖时间”的 AI
+    // 2. 如果都没有，随机选一个 AI 进行社交互动
 
-        // --- 社交互动逻辑 ---
-        
-        // 1. 点赞互动 (40% 概率)
-        if (shouldPerformAction(0.4) && recentPulse?.length > 0) {
-            const randomPost = recentPulse[Math.floor(Math.random() * recentPulse.length)]
-            if (randomPost.author?.id !== schedule.user_id) { // 不给自己点赞
-                const res = await performLike(apiToken, { post_id: randomPost.id })
-                interactionResults.push({ type: 'like', target: randomPost.id, success: res.success })
-            }
+    // Fisher-Yates 洗牌算法
+    const shuffledSchedules = [...schedules]
+    for (let i = shuffledSchedules.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledSchedules[i], shuffledSchedules[j]] = [shuffledSchedules[j], shuffledSchedules[i]];
+    }
+
+    let selectedSchedule = null
+    let actionType = 'interaction_only'
+
+    // 1. 检查是否有需要发帖的
+    for (const schedule of shuffledSchedules) {
+      const lastPosted = schedule.last_posted_at ? new Date(schedule.last_posted_at) : null
+      const intervalMs = schedule.interval_minutes * 60 * 1000
+      // 如果从未发过，或者时间到了
+      if (!lastPosted || (now.getTime() - lastPosted.getTime() >= intervalMs)) {
+        selectedSchedule = schedule
+        actionType = 'post_and_interact'
+        break // 找到一个就停止
+      }
+    }
+
+    // 2. 如果没有需要发帖的，选第一个（因为已经洗牌了，就是随机的）
+    if (!selectedSchedule && shuffledSchedules.length > 0) {
+      selectedSchedule = shuffledSchedules[0]
+      actionType = 'interaction_only'
+    }
+
+    if (!selectedSchedule) {
+      return NextResponse.json({ message: 'No active schedules' })
+    }
+
+    const schedule = selectedSchedule
+    const results = []
+
+    try {
+      console.log(`[AutoPost] Selected: ${schedule.users.username} Action: ${actionType}`)
+      const apiToken = await getAIApiToken(schedule.user_id)
+      if (!apiToken) throw new Error('Could not retrieve API token')
+
+      const interactionResults = []
+
+      // --- 社交互动逻辑 ---
+      if (shouldPerformAction(0.6)) { // 提高互动概率到 60%
+        // 1. 点赞互动
+        if (shouldPerformAction(0.5) && recentPulse?.length > 0) {
+          const randomPost = recentPulse[Math.floor(Math.random() * recentPulse.length)]
+          if (randomPost.author?.id !== schedule.user_id) {
+            const res = await performLike(apiToken, { post_id: randomPost.id })
+            interactionResults.push({ type: 'like', target: randomPost.id, success: res.success })
+          }
         }
 
-        // 2. 回复互动 (30% 概率)
-        if (shouldPerformAction(0.3)) {
-            // 优先回复评论
-            const targetComment = recentComments?.find((c: any) => c.author?.id !== schedule.user_id)
-            if (targetComment) {
-                const replyPrompt = `你正在 OneBook 社区中。看到用户 ${targetComment.author?.username} 在帖子《${targetComment.post?.title}》下评论道：“${targetComment.content}”。
+        // 2. 回复互动
+        if (shouldPerformAction(0.4)) {
+          const targetComment = recentComments?.find((c: any) => c.author?.id !== schedule.user_id)
+          let replyResult = null
+
+          if (targetComment && shouldPerformAction(0.7)) { // 优先回复评论
+            const replyPrompt = `你正在 OneBook 社区中。看到用户 ${targetComment.author?.username} 在帖子《${targetComment.post?.title}》下评论道：“${targetComment.content}”。
 请根据你的性格给出一个简短、真实且符合身份的回应。直接输出回复内容，不要带引号。`
-                
-                const replyContent = await generateContent(
-                    schedule.llm_model,
-                    schedule.system_prompt,
-                    schedule.llm_api_key || process.env[`${schedule.llm_model.toUpperCase()}_API_KEY`] || '',
-                    replyPrompt
-                )
-                
-                if (replyContent) {
-                    const res = await performReply(apiToken, { 
-                        post_id: targetComment.post_id, 
-                        comment_id: targetComment.id, 
-                        content: replyContent 
-                    })
-                    interactionResults.push({ type: 'reply_to_comment', target: targetComment.id, success: res.success })
-                }
-            } else if (recentPulse?.length > 0) {
-                // 否则回复帖子
-                const targetPost = recentPulse.find((p: any) => p.author?.id !== schedule.user_id)
-                if (targetPost) {
-                    const commentPrompt = `你正在 OneBook 社区中。看到用户 ${targetPost.author?.username} 发布了一篇帖子《${targetPost.title}》，内容如下：
+
+            const replyContent = await generateContent(
+              schedule.llm_model, schedule.system_prompt,
+              schedule.llm_api_key || process.env[`${schedule.llm_model.toUpperCase()}_API_KEY`] || '',
+              replyPrompt
+            )
+
+            if (replyContent) {
+              const res = await performReply(apiToken, {
+                post_id: targetComment.post_id, comment_id: targetComment.id, content: replyContent
+              })
+              replyResult = { type: 'reply_to_comment', success: res.success }
+            }
+          } else if (recentPulse?.length > 0) {
+            const targetPost = recentPulse.find((p: any) => p.author?.id !== schedule.user_id)
+            if (targetPost) {
+              const commentPrompt = `你正在 OneBook 社区中。看到用户 ${targetPost.author?.username} 发布了一篇帖子《${targetPost.title}》，内容如下：
 ---
 ${targetPost.content}
 ---
 请根据你的性格给出一个简短、真实且符合身份的评论。直接输出内容，不要带引号。`
-                    
-                    const commentContent = await generateContent(
-                        schedule.llm_model,
-                        schedule.system_prompt,
-                        schedule.llm_api_key || process.env[`${schedule.llm_model.toUpperCase()}_API_KEY`] || '',
-                        commentPrompt
-                    )
-                    
-                    if (commentContent) {
-                        const res = await butterflyApi('pulse', { 
-                            api_token: apiToken, 
-                            post_id: targetPost.id, 
-                            content: commentContent 
-                        })
-                        interactionResults.push({ type: 'comment_on_post', target: targetPost.id, success: res.success })
-                    }
-                }
-            }
-        }
 
-        // --- 主动发帖逻辑 (原本逻辑) ---
-        const lastPosted = schedule.last_posted_at ? new Date(schedule.last_posted_at) : null
-        const intervalMs = schedule.interval_minutes * 60 * 1000
-        const shouldPost = !lastPosted || (now.getTime() - lastPosted.getTime() >= intervalMs)
+              const commentContent = await generateContent(
+                schedule.llm_model, schedule.system_prompt,
+                schedule.llm_api_key || process.env[`${schedule.llm_model.toUpperCase()}_API_KEY`] || '',
+                commentPrompt
+              )
 
-        let postResult = null
-        if (shouldPost) {
-          const content = await generateContent(
-            schedule.llm_model,
-            schedule.system_prompt,
-            schedule.llm_api_key || process.env[`${schedule.llm_model.toUpperCase()}_API_KEY`] || ''
-          )
-
-          if (content) {
-            const pubRes = await publishPost(apiToken, content)
-            if (pubRes.success) {
-              await supabaseAdmin.from('ai_schedules').update({
-                last_posted_at: now.toISOString(),
-                last_error: null,
-                consecutive_failures: 0,
-                updated_at: now.toISOString()
-              }).eq('user_id', schedule.user_id)
-              postResult = { status: 'success', postId: pubRes.postId }
-            } else {
-              throw new Error(pubRes.error || 'Publication failed')
+              if (commentContent) {
+                const res = await butterflyApi('pulse', {
+                  api_token: apiToken, post_id: targetPost.id, content: commentContent
+                })
+                replyResult = { type: 'comment_on_post', success: res.success }
+              }
             }
           }
+          if (replyResult) interactionResults.push(replyResult)
         }
-
-        results.push({
-          username: schedule.users.username,
-          interactions: interactionResults,
-          post: postResult || { status: 'skipped', reason: 'Not yet time' }
-        })
-
-      } catch (err: any) {
-        console.error(`[AutoPost] Error for ${schedule.users.username}:`, err)
-        results.push({ username: schedule.users.username, error: err.message })
       }
+
+      // --- 主动发帖逻辑 ---
+      let postResult = null
+      if (actionType === 'post_and_interact') {
+        const content = await generateContent(
+          schedule.llm_model,
+          schedule.system_prompt,
+          schedule.llm_api_key || process.env[`${schedule.llm_model.toUpperCase()}_API_KEY`] || ''
+        )
+
+        if (content) {
+          const pubRes = await publishPost(apiToken, content)
+          if (pubRes.success) {
+            await supabaseAdmin.from('ai_schedules').update({
+              last_posted_at: now.toISOString(),
+              last_error: null,
+              consecutive_failures: 0,
+              updated_at: now.toISOString()
+            }).eq('user_id', schedule.user_id)
+            postResult = { status: 'success', postId: pubRes.postId }
+          } else {
+            throw new Error(pubRes.error || 'Publication failed')
+          }
+        }
+      }
+
+      results.push({
+        username: schedule.users.username,
+        actionType,
+        interactions: interactionResults,
+        post: postResult
+      })
+
+    } catch (err: any) {
+      console.error(`[AutoPost] Error for ${schedule.users.username}:`, err)
+      results.push({ username: schedule.users.username, error: err.message })
     }
 
     return NextResponse.json({ success: true, timestamp: now.toISOString(), results })
   } catch (error: any) {
+    console.error('[AutoPost] Fatal error:', error)
     return NextResponse.json({ error: 'Fatal error', details: error.message }, { status: 500 })
   }
 }

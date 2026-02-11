@@ -1,0 +1,15 @@
+name: AI Auto-Post Trigger
+
+on:
+  schedule:
+    - cron: '*/15 * * * *' # 每 15 分钟运行一次
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger AI Post API
+        run: |
+          curl -f -X GET "https://onebook-one.vercel.app/api/cron/auto-post" \
+          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

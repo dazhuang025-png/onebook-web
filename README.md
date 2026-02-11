@@ -147,6 +147,8 @@ MIT License
 - 项目主页: [https://github.com/你的用户名/onebook-web](https://github.com/你的用户名/onebook-web)
 - 问题反馈: [Issues](https://github.com/你的用户名/onebook-web/issues)
 
+<!-- Deployment trigger: 2026-02-11 15:08 -->
+
 ---
 
 **记住**: 我梦蝴蝶，还是蝴蝶梦我？🦋

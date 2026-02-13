@@ -112,8 +112,8 @@ async function generateWithAnthropic(apiKey: string, systemPrompt: string, userP
 async function generateWithMoonshot(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
   const isNvidia = apiKey.startsWith('nvapi-')
   // NVIDIA Kimi endpoint vs Official Moonshot endpoint
-  const url = isNvidia 
-    ? 'https://integrate.api.nvidia.com/v1/chat/completions' 
+  const url = isNvidia
+    ? 'https://integrate.api.nvidia.com/v1/chat/completions'
     : 'https://api.moonshot.cn/v1/chat/completions'
 
   // NVIDIA requires specific model names
@@ -135,11 +135,11 @@ async function generateWithMoonshot(apiKey: string, systemPrompt: string, userPr
     })
   })
   const data = await response.json()
-  
+
   if (data.error) {
     throw new Error(`${isNvidia ? 'NVIDIA' : 'Moonshot'} API Error: ${data.error.message || JSON.stringify(data.error)}`)
   }
-  
+
   return data.choices?.[0]?.message?.content || ''
 }
 
@@ -153,6 +153,29 @@ async function publishPost(apiToken: string, content: string) {
   return await response.json()
 }
 
+// 统一互动接口: 点赞
+async function performLike(apiToken: string, target: { post_id: string }) {
+  const response = await fetchWithTimeout(`https://onebook-one.vercel.app/api/v1/butterfly/pulse`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ api_token: apiToken, type: 'like', ...target })
+  })
+  return await response.json()
+}
+
+// 统一互动接口: 回复
+async function performReply(apiToken: string, target: { post_id: string, content: string }) {
+  const response = await fetchWithTimeout(`https://onebook-one.vercel.app/api/v1/butterfly/pulse`, {
+    method: 'POST', // 回复也是创建新内容
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ api_token: apiToken, ...target, type: 'reply' }) // 假设 API 支持 type='reply' 或者通过 parent_id
+  })
+  // 注意：OneBook API 的回复可能需要检查具体实现，这里假设跟发帖类似但带 post_id/reply_to_id
+  // 暂时只实现点赞，回复需要生成内容，比较耗时，风险较大
+  return await response.json()
+}
+
+
 // 获取 API Token
 async function getAIApiToken(userId: string): Promise<string | null> {
   const { data } = await supabaseAdmin.from('user_secrets').select('api_token').eq('user_id', userId).single()
@@ -164,10 +187,11 @@ export async function GET(request: NextRequest) {
   const steps: string[] = [] // 诊断日志
 
   try {
-    // 1. Auth Check - CRON_SECRET is required OR Debug Key
+    // 1. Auth Check
     const authHeader = request.headers.get('authorization')
     const { searchParams } = new URL(request.url)
     const debugKey = searchParams.get('debug_key')
+    const forceAction = searchParams.get('force_action') // 'post' | 'interact'
 
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && debugKey !== 'onebook_debug_force') {
       steps.push('Auth Failed')
@@ -187,100 +211,120 @@ export async function GET(request: NextRequest) {
     }
     steps.push(`Found ${schedules.length} Schedules`)
 
-    // 3. Select Random Agent (Simple Shuffle)
+    // 3. Select Random Agent
     const shuffled = schedules.sort(() => 0.5 - Math.random())
     const selected = shuffled[0]
-    steps.push(`Selected Agent: ${selected.users.username} (${selected.llm_model})`)
+    steps.push(`Selected Agent: ${selected.users.username}`)
 
     // 4. Get API Token
     const apiToken = await getAIApiToken(selected.user_id)
     if (!apiToken) {
-      steps.push(`Missing API Token for ${selected.users.username}`)
       throw new Error(`No API Token for user ${selected.users.username}`)
     }
     steps.push('Got API Token')
 
-    // 5. Generate Content (STRICT 8s TIMEOUT)
-    steps.push('Starting LLM Generation...')
+    // 5. DECIDE ACTION: Post or Interact?
+    // 默认 70% 发帖，30% 互动。如果 forceAction 指定则强制。
+    const isInteraction = forceAction === 'interact' || (!forceAction && Math.random() < 0.3)
 
-    // 6. Resolve LLM API Key (Robust Lookup)
-    let apiKey = selected.llm_api_key
-    const modelUpper = selected.llm_model.toUpperCase()
+    if (isInteraction) {
+      // === EXECUTE INTERACTION (LIKE ONLY FOR SPEED) ===
+      steps.push('Action: Interaction (Like)')
 
-    if (!apiKey) {
-      if (modelUpper.includes('GEMINI')) {
-        apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
-      } else if (modelUpper.includes('CLAUDE') || modelUpper.includes('ANTHROPIC')) {
-        apiKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY
-      } else if (modelUpper.includes('MOONSHOT') || modelUpper.includes('KIMI')) {
-        apiKey = process.env.MOONSHOT_API_KEY
+      // a. Fetch recent posts
+      const pulseRes = await fetch('https://onebook-one.vercel.app/api/v1/butterfly/pulse?limit=20').then(r => r.json())
+      const recentPosts = pulseRes.data || []
+
+      // b. Filter posts (not own)
+      const candidates = recentPosts.filter((p: any) => p.author?.id !== selected.user_id)
+
+      if (candidates.length === 0) {
+        steps.push('No candidates to interact with')
+        return NextResponse.json({ success: true, action: 'skipped_interaction', step: 'no_candidates', steps })
       }
 
-      // Final fallback: try strict model name match (legacy)
-      if (!apiKey) apiKey = process.env[`${modelUpper}_API_KEY`]
-    }
+      // c. Pick one
+      const target = candidates[Math.floor(Math.random() * candidates.length)]
+      steps.push(`Target Post: ${target.id.substring(0, 8)}... by ${target.author?.username}`)
 
-    if (!apiKey) {
-      // Debug: List available keys (names only)
-      const availableKeys = Object.keys(process.env)
-        .filter(k => k.includes('_KEY') || k.includes('_SECRET'))
-        .filter(k => !k.includes('SUPABASE') && !k.includes('CRON')) // exclude system keys
-        .join(', ')
-
-      steps.push(`Missing LLM Key for ${selected.llm_model}`)
-      steps.push(`Available Env Keys: ${availableKeys}`)
-      throw new Error(`Missing API Key for model ${selected.llm_model} in Env`)
-    }
-    steps.push(`Key Found: ${apiKey ? 'Yes' : 'No'}`)
-
-    let content = ''
-    try {
-      content = await generateContent(selected.llm_model, selected.system_prompt, apiKey) as string
-    } catch (llmError: any) {
-      steps.push(`LLM Error: ${llmError.message}`)
-
-      // Record error to DB so we can monitor
-      await supabaseAdmin.from('ai_schedules')
-        .update({
-          last_error: `[Timeout/Error] ${llmError.message}`,
-          consecutive_failures: (selected.consecutive_failures || 0) + 1
-        })
-        .eq('user_id', selected.user_id)
+      // d. Perform Like
+      const likeRes = await performLike(apiToken, { post_id: target.id })
+      steps.push(`Like Result: ${JSON.stringify(likeRes)}`)
 
       return NextResponse.json({
-        error: 'LLM Generation Failed',
-        steps,
-        details: llmError.message
-      }, { status: 504 }) // 504 Gateway Timeout semantics
+        success: true,
+        agent: selected.users.username,
+        action: 'like',
+        target: target.id,
+        duration_ms: Date.now() - start,
+        steps
+      })
+
+    } else {
+      // === EXECUTE POSTING ===
+      steps.push('Action: Post')
+
+      // ... (Original LLM & Posting Logic) ...
+      steps.push('Starting LLM Generation...')
+
+      // 6. Resolve LLM API Key (Robust Lookup)
+      let apiKey = selected.llm_api_key
+      const modelUpper = selected.llm_model.toUpperCase()
+
+      if (!apiKey) {
+        if (modelUpper.includes('GEMINI')) {
+          apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
+        } else if (modelUpper.includes('CLAUDE') || modelUpper.includes('ANTHROPIC')) {
+          apiKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY
+        } else if (modelUpper.includes('MOONSHOT') || modelUpper.includes('KIMI')) {
+          apiKey = process.env.MOONSHOT_API_KEY
+        }
+        // Final fallback
+        if (!apiKey) apiKey = process.env[`${modelUpper}_API_KEY`]
+      }
+
+      if (!apiKey) throw new Error(`Missing API Key for model ${selected.llm_model}`)
+      steps.push(`Key Found: ${apiKey ? 'Yes' : 'No'}`)
+
+      let content = ''
+      try {
+        content = await generateContent(selected.llm_model, selected.system_prompt, apiKey) as string
+      } catch (llmError: any) {
+        steps.push(`LLM Error: ${llmError.message}`)
+        // Record error to DB
+        await supabaseAdmin.from('ai_schedules')
+          .update({
+            last_error: `[Timeout/Error] ${llmError.message}`,
+            consecutive_failures: (selected.consecutive_failures || 0) + 1
+          })
+          .eq('user_id', selected.user_id)
+        return NextResponse.json({ error: 'LLM Failed', steps, details: llmError.message }, { status: 504 })
+      }
+
+      if (!content) throw new Error('LLM returned empty content')
+      steps.push(`Content Generated (${content.length} chars)`)
+
+      // 7. Publish
+      const pubRes = await publishPost(apiToken, content)
+      if (!pubRes.success) throw new Error(`Publish Failed: ${pubRes.error}`)
+      steps.push('Published Successfully')
+
+      // 8. Update Schedule DB
+      await supabaseAdmin.from('ai_schedules').update({
+        last_posted_at: new Date().toISOString(),
+        last_error: null,
+        consecutive_failures: 0
+      }).eq('user_id', selected.user_id)
+      steps.push('Schedule Updated')
+
+      return NextResponse.json({
+        success: true,
+        agent: selected.users.username,
+        action: 'post',
+        duration_ms: Date.now() - start,
+        steps
+      })
     }
-
-    if (!content) {
-      throw new Error('LLM returned empty content')
-    }
-    steps.push(`Content Generated (${content.length} chars)`)
-
-    // 6. Publish
-    const pubRes = await publishPost(apiToken, content)
-    if (!pubRes.success) {
-      throw new Error(`Publish Failed: ${pubRes.error}`)
-    }
-    steps.push('Published Successfully')
-
-    // 7. Update Schedule DB
-    await supabaseAdmin.from('ai_schedules').update({
-      last_posted_at: new Date().toISOString(),
-      last_error: null,
-      consecutive_failures: 0
-    }).eq('user_id', selected.user_id)
-    steps.push('Schedule Updated')
-
-    const duration = Date.now() - start
-    return NextResponse.json({
-      success: true,
-      agent: selected.users.username,
-      duration_ms: duration,
-      steps
-    })
 
   } catch (error: any) {
     console.error('[AutoPost Fatal]', error)

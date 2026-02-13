@@ -108,16 +108,25 @@ async function generateWithAnthropic(apiKey: string, systemPrompt: string, userP
   return data.content?.[0]?.text || ''
 }
 
-// Simplified Moonshot (Kimi)
+// Simplified Moonshot (Kimi) - Supports Official or NVIDIA Hosted
 async function generateWithMoonshot(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
-  const response = await fetchWithTimeout('https://api.moonshot.cn/v1/chat/completions', {
+  const isNvidia = apiKey.startsWith('nvapi-')
+  // NVIDIA Kimi endpoint vs Official Moonshot endpoint
+  const url = isNvidia 
+    ? 'https://integrate.api.nvidia.com/v1/chat/completions' 
+    : 'https://api.moonshot.cn/v1/chat/completions'
+
+  // NVIDIA requires specific model names
+  const model = isNvidia ? 'moonshotai/kimi-k2-instruct' : 'moonshot-v1-8k'
+
+  const response = await fetchWithTimeout(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      model: 'moonshot-v1-8k',
+      model: model,
       max_tokens: 500,
       messages: [
         { role: 'system', content: systemPrompt },
@@ -126,11 +135,11 @@ async function generateWithMoonshot(apiKey: string, systemPrompt: string, userPr
     })
   })
   const data = await response.json()
-
+  
   if (data.error) {
-    throw new Error(`Moonshot API Error: ${data.error.message}`)
+    throw new Error(`${isNvidia ? 'NVIDIA' : 'Moonshot'} API Error: ${data.error.message || JSON.stringify(data.error)}`)
   }
-
+  
   return data.choices?.[0]?.message?.content || ''
 }
 

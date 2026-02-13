@@ -56,8 +56,10 @@ async function generateContent(
 }
 
 async function generateWithGemini(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
+  // Fallback to 1.5-flash for stability
+  const model = 'gemini-1.5-flash'
   const response = await fetchWithTimeout(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -68,10 +70,17 @@ async function generateWithGemini(apiKey: string, systemPrompt: string, userProm
     }
   )
   const data = await response.json()
+
+  // Check for upstream errors
+  if (data.error) {
+    throw new Error(`Gemini API Error: ${data.error.message || JSON.stringify(data.error)}`)
+  }
+
   if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
     return data.candidates[0].content.parts[0].text
   }
-  throw new Error('Gemini: No content')
+
+  throw new Error(`Gemini No Content. Raw: ${JSON.stringify(data)}`)
 }
 
 // Simplified Anthropic (Claude)
@@ -84,13 +93,18 @@ async function generateWithAnthropic(apiKey: string, systemPrompt: string, userP
       'anthropic-version': '2023-06-01'
     },
     body: JSON.stringify({
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-3-haiku-20240307', // Use stable Haiku
       max_tokens: 500,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }]
     })
   })
   const data = await response.json()
+
+  if (data.error) {
+    throw new Error(`Anthropic API Error: ${data.error.message}`)
+  }
+
   return data.content?.[0]?.text || ''
 }
 
@@ -112,6 +126,11 @@ async function generateWithMoonshot(apiKey: string, systemPrompt: string, userPr
     })
   })
   const data = await response.json()
+
+  if (data.error) {
+    throw new Error(`Moonshot API Error: ${data.error.message}`)
+  }
+
   return data.choices?.[0]?.message?.content || ''
 }
 

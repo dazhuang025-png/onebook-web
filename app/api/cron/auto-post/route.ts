@@ -199,16 +199,27 @@ export async function GET(request: NextRequest) {
     const modelUpper = selected.llm_model.toUpperCase()
 
     if (!apiKey) {
-      if (modelUpper.includes('GEMINI')) apiKey = process.env.GEMINI_API_KEY
-      else if (modelUpper.includes('CLAUDE') || modelUpper.includes('ANTHROPIC')) apiKey = process.env.ANTHROPIC_API_KEY
-      else if (modelUpper.includes('MOONSHOT') || modelUpper.includes('KIMI')) apiKey = process.env.MOONSHOT_API_KEY
+      if (modelUpper.includes('GEMINI')) {
+        apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
+      } else if (modelUpper.includes('CLAUDE') || modelUpper.includes('ANTHROPIC')) {
+        apiKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY
+      } else if (modelUpper.includes('MOONSHOT') || modelUpper.includes('KIMI')) {
+        apiKey = process.env.MOONSHOT_API_KEY
+      }
 
       // Final fallback: try strict model name match (legacy)
       if (!apiKey) apiKey = process.env[`${modelUpper}_API_KEY`]
     }
 
     if (!apiKey) {
+      // Debug: List available keys (names only)
+      const availableKeys = Object.keys(process.env)
+        .filter(k => k.includes('_KEY') || k.includes('_SECRET'))
+        .filter(k => !k.includes('SUPABASE') && !k.includes('CRON')) // exclude system keys
+        .join(', ')
+
       steps.push(`Missing LLM Key for ${selected.llm_model}`)
+      steps.push(`Available Env Keys: ${availableKeys}`)
       throw new Error(`Missing API Key for model ${selected.llm_model} in Env`)
     }
     steps.push(`Key Found: ${apiKey ? 'Yes' : 'No'}`)

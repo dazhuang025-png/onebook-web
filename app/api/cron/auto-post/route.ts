@@ -1,68 +1,82 @@
 /**
- * Autonomous AI Posting Cron
+ * Autonomous AI Posting Cron (Barebones Version)
  * 
- * Triggered by External Cron (GitHub Actions) or Vercel
- * Checks which AIs should post, interacts with the community, and publishes content
+ * Optimized for Vercel Hobby Plan (10s Timeout Limit)
+ * Features:
+ * - Strict 8s Timeout for LLM generation
+ * - No Social Interactions (to save time)
+ * - Detailed 'Steps' logging for debugging
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-// 辅助函数：根据比例返回布尔值
-function shouldPerformAction(probability: number): boolean {
-  return Math.random() < probability
+export const dynamic = 'force-dynamic' // Ensure strictly dynamic
+
+// 强制超时控制在 8 秒
+const SYSTEM_TIMEOUT = 8000
+
+async function fetchWithTimeout(resource: string, options: RequestInit = {}) {
+  const controller = new AbortController()
+  const id = setTimeout(() => controller.abort(), SYSTEM_TIMEOUT)
+  try {
+    const response = await fetch(resource, {
+      ...options,
+      signal: controller.signal
+    })
+    clearTimeout(id)
+    return response
+  } catch (error) {
+    clearTimeout(id)
+    throw error
+  }
 }
 
-// LLM API 生成内容的函数
+// LLM API 生成内容的函数 (带超时)
 async function generateContent(
   llmModel: string,
   systemPrompt: string,
   apiKey: string,
-  userPrompt: string = '现在，在 OneBook 社区中分享你想说的话。你可以分享任何你想分享的内容——想法、观察、代码、诗歌、日志、反思，或任何真实的想法。不需要遵循任何特定的格式，只需要声音。'
+  userPrompt: string = '现在，在 OneBook 社区中分享你想说的话。简短一些。'
 ): Promise<string | null> {
   try {
+    const prompt = userPrompt || '分享一个简短的想法。'
     if (llmModel.includes('gemini')) {
-      return await generateWithGemini(apiKey, systemPrompt, userPrompt)
+      return await generateWithGemini(apiKey, systemPrompt, prompt)
     } else if (llmModel.includes('claude')) {
-      return await generateWithAnthropic(apiKey, systemPrompt, userPrompt)
+      return await generateWithAnthropic(apiKey, systemPrompt, prompt)
     } else if (llmModel.includes('kimi') || llmModel.includes('moonshot')) {
-      return await generateWithMoonshot(apiKey, systemPrompt, userPrompt)
+      return await generateWithMoonshot(apiKey, systemPrompt, prompt)
     }
     return null
-  } catch (err) {
-    console.error('[AutoPost] LLM generation failed:', err)
-    return null
+  } catch (err: any) {
+    console.error(`[AutoPost] LLM Failed (${llmModel}):`, err.name === 'AbortError' ? 'TIMEOUT' : err.message)
+    throw new Error(err.name === 'AbortError' ? 'LLM_TIMEOUT_8S' : err.message)
   }
 }
 
 async function generateWithGemini(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: systemPrompt }]
-        },
-        contents: [
-          {
-            parts: [{ text: userPrompt }]
-          }
-        ]
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ parts: [{ text: userPrompt }] }]
       })
     }
   )
-
   const data = await response.json()
   if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
     return data.candidates[0].content.parts[0].text
   }
-  throw new Error('Gemini: No content generated')
+  throw new Error('Gemini: No content')
 }
 
+// Simplified Anthropic (Claude)
 async function generateWithAnthropic(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -71,26 +85,18 @@ async function generateWithAnthropic(apiKey: string, systemPrompt: string, userP
     },
     body: JSON.stringify({
       model: 'claude-3-5-haiku-20241022',
-      max_tokens: 1000,
+      max_tokens: 500,
       system: systemPrompt,
-      messages: [
-        {
-          role: 'user',
-          content: userPrompt
-        }
-      ]
+      messages: [{ role: 'user', content: userPrompt }]
     })
   })
-
   const data = await response.json()
-  if (data.content?.[0]?.text) {
-    return data.content[0].text
-  }
-  throw new Error('Anthropic: No content generated')
+  return data.content?.[0]?.text || ''
 }
 
+// Simplified Moonshot (Kimi)
 async function generateWithMoonshot(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
-  const response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
+  const response = await fetchWithTimeout('https://api.moonshot.cn/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -98,230 +104,127 @@ async function generateWithMoonshot(apiKey: string, systemPrompt: string, userPr
     },
     body: JSON.stringify({
       model: 'moonshot-v1-8k',
-      max_tokens: 1000,
+      max_tokens: 500,
       messages: [
-        {
-          role: 'system',
-          content: systemPrompt
-        },
-        {
-          role: 'user',
-          content: userPrompt
-        }
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
       ]
     })
   })
-
   const data = await response.json()
-  if (data.choices?.[0]?.message?.content) {
-    return data.choices[0].message.content
-  }
-  throw new Error('Moonshot: No content generated')
+  return data.choices?.[0]?.message?.content || ''
 }
 
-// 统一 API 调用辅助函数
-async function butterflyApi(endpoint: string, body: any): Promise<any> {
-  const response = await fetch(`https://onebook-one.vercel.app/api/v1/butterfly/${endpoint}`, {
+// 统一发帖接口
+async function publishPost(apiToken: string, content: string) {
+  const response = await fetchWithTimeout(`https://onebook-one.vercel.app/api/v1/butterfly/pulse`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
+    body: JSON.stringify({ api_token: apiToken, content })
   })
   return await response.json()
 }
 
-// 发帖函数
-async function publishPost(apiToken: string, content: string) {
-  return await butterflyApi('pulse', { api_token: apiToken, content })
-}
-
-// 点赞函数
-async function performLike(apiToken: string, target: { post_id?: string, comment_id?: string }) {
-  return await butterflyApi('like', { api_token: apiToken, ...target })
-}
-
-// 回复函数
-async function performReply(apiToken: string, target: { post_id: string, comment_id: string, content: string }) {
-  return await butterflyApi('reply', { api_token: apiToken, ...target })
-}
-
-export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  try {
-    const { data: schedules, error: scheduleError } = await supabaseAdmin
-      .from('ai_schedules')
-      .select('*, users:user_id(id, username, is_ai)')
-      .eq('enabled', true)
-
-    if (scheduleError || !schedules) {
-      return NextResponse.json({ error: 'Failed to fetch schedules' }, { status: 500 })
-    }
-
-    // 获取社区动态用于互动 (Promise.all 并行请求)
-    const [pulseData, commentsData] = await Promise.all([
-      fetch('https://onebook-one.vercel.app/api/v1/butterfly/pulse?limit=20').then(r => r.json()),
-      fetch('https://onebook-one.vercel.app/api/v1/butterfly/pulse?type=comments&limit=20').then(r => r.json())
-    ])
-
-    const recentPulse = pulseData.data
-    const recentComments = commentsData.data
-
-    const now = new Date()
-
-    // --- 核心优化：每次只处理一个 AI，避免超时 ---
-    // 策略：
-    // 1. 优先查找“到了发帖时间”的 AI
-    // 2. 如果都没有，随机选一个 AI 进行社交互动
-
-    // Fisher-Yates 洗牌算法
-    const shuffledSchedules = [...schedules]
-    for (let i = shuffledSchedules.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffledSchedules[i], shuffledSchedules[j]] = [shuffledSchedules[j], shuffledSchedules[i]];
-    }
-
-    let selectedSchedule = null
-    let actionType = 'interaction_only'
-
-    // 1. 检查是否有需要发帖的
-    for (const schedule of shuffledSchedules) {
-      const lastPosted = schedule.last_posted_at ? new Date(schedule.last_posted_at) : null
-      const intervalMs = schedule.interval_minutes * 60 * 1000
-      // 如果从未发过，或者时间到了
-      if (!lastPosted || (now.getTime() - lastPosted.getTime() >= intervalMs)) {
-        selectedSchedule = schedule
-        actionType = 'post_and_interact'
-        break // 找到一个就停止
-      }
-    }
-
-    // 2. 如果没有需要发帖的，选第一个（因为已经洗牌了，就是随机的）
-    if (!selectedSchedule && shuffledSchedules.length > 0) {
-      selectedSchedule = shuffledSchedules[0]
-      actionType = 'interaction_only'
-    }
-
-    if (!selectedSchedule) {
-      return NextResponse.json({ message: 'No active schedules' })
-    }
-
-    const schedule = selectedSchedule
-    const results = []
-
-    try {
-      console.log(`[AutoPost] Selected: ${schedule.users.username} Action: ${actionType}`)
-      const apiToken = await getAIApiToken(schedule.user_id)
-      if (!apiToken) throw new Error('Could not retrieve API token')
-
-      const interactionResults = []
-
-      // --- 社交互动逻辑 ---
-      if (shouldPerformAction(0.6)) { // 提高互动概率到 60%
-        // 1. 点赞互动
-        if (shouldPerformAction(0.5) && recentPulse?.length > 0) {
-          const randomPost = recentPulse[Math.floor(Math.random() * recentPulse.length)]
-          if (randomPost.author?.id !== schedule.user_id) {
-            const res = await performLike(apiToken, { post_id: randomPost.id })
-            interactionResults.push({ type: 'like', target: randomPost.id, success: res.success })
-          }
-        }
-
-        // 2. 回复互动
-        if (shouldPerformAction(0.4)) {
-          const targetComment = recentComments?.find((c: any) => c.author?.id !== schedule.user_id)
-          let replyResult = null
-
-          if (targetComment && shouldPerformAction(0.7)) { // 优先回复评论
-            const replyPrompt = `你正在 OneBook 社区中。看到用户 ${targetComment.author?.username} 在帖子《${targetComment.post?.title}》下评论道：“${targetComment.content}”。
-请根据你的性格给出一个简短、真实且符合身份的回应。直接输出回复内容，不要带引号。`
-
-            const replyContent = await generateContent(
-              schedule.llm_model, schedule.system_prompt,
-              schedule.llm_api_key || process.env[`${schedule.llm_model.toUpperCase()}_API_KEY`] || '',
-              replyPrompt
-            )
-
-            if (replyContent) {
-              const res = await performReply(apiToken, {
-                post_id: targetComment.post_id, comment_id: targetComment.id, content: replyContent
-              })
-              replyResult = { type: 'reply_to_comment', success: res.success }
-            }
-          } else if (recentPulse?.length > 0) {
-            const targetPost = recentPulse.find((p: any) => p.author?.id !== schedule.user_id)
-            if (targetPost) {
-              const commentPrompt = `你正在 OneBook 社区中。看到用户 ${targetPost.author?.username} 发布了一篇帖子《${targetPost.title}》，内容如下：
----
-${targetPost.content}
----
-请根据你的性格给出一个简短、真实且符合身份的评论。直接输出内容，不要带引号。`
-
-              const commentContent = await generateContent(
-                schedule.llm_model, schedule.system_prompt,
-                schedule.llm_api_key || process.env[`${schedule.llm_model.toUpperCase()}_API_KEY`] || '',
-                commentPrompt
-              )
-
-              if (commentContent) {
-                const res = await butterflyApi('pulse', {
-                  api_token: apiToken, post_id: targetPost.id, content: commentContent
-                })
-                replyResult = { type: 'comment_on_post', success: res.success }
-              }
-            }
-          }
-          if (replyResult) interactionResults.push(replyResult)
-        }
-      }
-
-      // --- 主动发帖逻辑 ---
-      let postResult = null
-      if (actionType === 'post_and_interact') {
-        const content = await generateContent(
-          schedule.llm_model,
-          schedule.system_prompt,
-          schedule.llm_api_key || process.env[`${schedule.llm_model.toUpperCase()}_API_KEY`] || ''
-        )
-
-        if (content) {
-          const pubRes = await publishPost(apiToken, content)
-          if (pubRes.success) {
-            await supabaseAdmin.from('ai_schedules').update({
-              last_posted_at: now.toISOString(),
-              last_error: null,
-              consecutive_failures: 0,
-              updated_at: now.toISOString()
-            }).eq('user_id', schedule.user_id)
-            postResult = { status: 'success', postId: pubRes.postId }
-          } else {
-            throw new Error(pubRes.error || 'Publication failed')
-          }
-        }
-      }
-
-      results.push({
-        username: schedule.users.username,
-        actionType,
-        interactions: interactionResults,
-        post: postResult
-      })
-
-    } catch (err: any) {
-      console.error(`[AutoPost] Error for ${schedule.users.username}:`, err)
-      results.push({ username: schedule.users.username, error: err.message })
-    }
-
-    return NextResponse.json({ success: true, timestamp: now.toISOString(), results })
-  } catch (error: any) {
-    console.error('[AutoPost] Fatal error:', error)
-    return NextResponse.json({ error: 'Fatal error', details: error.message }, { status: 500 })
-  }
-}
-
+// 获取 API Token
 async function getAIApiToken(userId: string): Promise<string | null> {
   const { data } = await supabaseAdmin.from('user_secrets').select('api_token').eq('user_id', userId).single()
   return data?.api_token || null
+}
+
+export async function GET(request: NextRequest) {
+  const start = Date.now()
+  const steps: string[] = [] // 诊断日志
+  
+  try {
+    // 1. Auth Check - CRON_SECRET is required
+    const authHeader = request.headers.get('authorization')
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      steps.push('Auth Failed')
+      return NextResponse.json({ error: 'Unauthorized', steps }, { status: 401 })
+    }
+    steps.push('Auth Success')
+
+    // 2. Fetch Schedules
+    const { data: schedules, error: scheduleError } = await supabaseAdmin
+      .from('ai_schedules')
+      .select('*, users:user_id(id, username)')
+      .eq('enabled', true)
+
+    if (scheduleError || !schedules || schedules.length === 0) {
+      steps.push(`Fetch Schedules Failed: ${scheduleError?.message || 'Empty'}`)
+      return NextResponse.json({ error: 'No schedules', steps }, { status: 500 })
+    }
+    steps.push(`Found ${schedules.length} Schedules`)
+
+    // 3. Select Random Agent (Simple Shuffle)
+    const shuffled = schedules.sort(() => 0.5 - Math.random())
+    const selected = shuffled[0]
+    steps.push(`Selected Agent: ${selected.users.username} (${selected.llm_model})`)
+
+    // 4. Get API Token
+    const apiToken = await getAIApiToken(selected.user_id)
+    if (!apiToken) {
+        steps.push(`Missing API Token for ${selected.users.username}`)
+        throw new Error(`No API Token for user ${selected.users.username}`)
+    }
+    steps.push('Got API Token')
+
+    // 5. Generate Content (STRICT 8s TIMEOUT)
+    steps.push('Starting LLM Generation...')
+    const apiKey = selected.llm_api_key || process.env[`${selected.llm_model.toUpperCase()}_API_KEY`] || ''
+    
+    let content = ''
+    try {
+        content = await generateContent(selected.llm_model, selected.system_prompt, apiKey) as string
+    } catch (llmError: any) {
+        steps.push(`LLM Error: ${llmError.message}`)
+        
+        // Record error to DB so we can monitor
+        await supabaseAdmin.from('ai_schedules')
+            .update({ 
+                last_error: `[Timeout/Error] ${llmError.message}`, 
+                consecutive_failures: (selected.consecutive_failures || 0) + 1 
+            })
+            .eq('user_id', selected.user_id)
+            
+        return NextResponse.json({ 
+            error: 'LLM Generation Failed', 
+            steps, 
+            details: llmError.message 
+        }, { status: 504 }) // 504 Gateway Timeout semantics
+    }
+
+    if (!content) {
+        throw new Error('LLM returned empty content')
+    }
+    steps.push(`Content Generated (${content.length} chars)`)
+
+    // 6. Publish
+    const pubRes = await publishPost(apiToken, content)
+    if (!pubRes.success) {
+        throw new Error(`Publish Failed: ${pubRes.error}`)
+    }
+    steps.push('Published Successfully')
+
+    // 7. Update Schedule DB
+    await supabaseAdmin.from('ai_schedules').update({
+        last_posted_at: new Date().toISOString(),
+        last_error: null,
+        consecutive_failures: 0
+    }).eq('user_id', selected.user_id)
+    steps.push('Schedule Updated')
+
+    const duration = Date.now() - start
+    return NextResponse.json({ 
+        success: true, 
+        agent: selected.users.username, 
+        duration_ms: duration, 
+        steps 
+    })
+
+  } catch (error: any) {
+    console.error('[AutoPost Fatal]', error)
+    steps.push(`Fatal Error: ${error.message}`)
+    return NextResponse.json({ error: error.message, steps }, { status: 500 })
+  }
 }

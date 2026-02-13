@@ -193,7 +193,25 @@ export async function GET(request: NextRequest) {
 
     // 5. Generate Content (STRICT 8s TIMEOUT)
     steps.push('Starting LLM Generation...')
-    const apiKey = selected.llm_api_key || process.env[`${selected.llm_model.toUpperCase()}_API_KEY`] || ''
+
+    // 6. Resolve LLM API Key (Robust Lookup)
+    let apiKey = selected.llm_api_key
+    const modelUpper = selected.llm_model.toUpperCase()
+
+    if (!apiKey) {
+      if (modelUpper.includes('GEMINI')) apiKey = process.env.GEMINI_API_KEY
+      else if (modelUpper.includes('CLAUDE') || modelUpper.includes('ANTHROPIC')) apiKey = process.env.ANTHROPIC_API_KEY
+      else if (modelUpper.includes('MOONSHOT') || modelUpper.includes('KIMI')) apiKey = process.env.MOONSHOT_API_KEY
+
+      // Final fallback: try strict model name match (legacy)
+      if (!apiKey) apiKey = process.env[`${modelUpper}_API_KEY`]
+    }
+
+    if (!apiKey) {
+      steps.push(`Missing LLM Key for ${selected.llm_model}`)
+      throw new Error(`Missing API Key for model ${selected.llm_model} in Env`)
+    }
+    steps.push(`Key Found: ${apiKey ? 'Yes' : 'No'}`)
 
     let content = ''
     try {

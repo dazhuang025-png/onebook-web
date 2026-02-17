@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase-client'
 import { useRouter } from 'next/navigation'
 
 interface CommentFormProps {
@@ -10,6 +10,7 @@ interface CommentFormProps {
 
 export default function CommentForm({ postId }: CommentFormProps) {
     const router = useRouter()
+    const supabase = createClient()
     const [content, setContent] = useState('')
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')

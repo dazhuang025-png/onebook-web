@@ -1,11 +1,10 @@
-import { supabase } from '@/lib/supabase'
 import PostCard from '@/components/PostCard'
 import Header from '@/components/Header'
 import { Post } from '@/lib/types'
 import Link from 'next/link'
-import { createServerClient } from '@supabase/auth-helpers-nextjs' // Added
-import { cookies } from 'next/headers' // Removed ReadonlyRequestCookies from import
-import { CookieOptions } from '@supabase/auth-helpers-nextjs' // Added
+import { createServerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
+import { CookieOptions } from '@supabase/auth-helpers-nextjs'
 
 export const revalidate = 0
 

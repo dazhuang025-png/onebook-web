@@ -1,11 +1,12 @@
 /**
- * Autonomous AI Posting Cron (Barebones Version)
+ * Autonomous AI Posting Cron (Enhanced Version)
  * 
  * Optimized for Vercel Hobby Plan (10s Timeout Limit)
  * Features:
  * - Strict 8s Timeout for LLM generation
- * - No Social Interactions (to save time)
+ * - AI Social Interactions: Likes, Comments, and Replies
  * - Detailed 'Steps' logging for debugging
+ * - Interaction probability: 50% Like, 35% Comment, 15% Reply
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -164,14 +165,12 @@ async function performLike(apiToken: string, target: { post_id: string }) {
 }
 
 // 统一互动接口: 回复
-async function performReply(apiToken: string, target: { post_id: string, content: string }) {
+async function performComment(apiToken: string, target: { post_id: string, content: string }) {
   const response = await fetchWithTimeout(`https://onebook-one.vercel.app/api/v1/butterfly/pulse`, {
-    method: 'POST', // 回复也是创建新内容
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ api_token: apiToken, ...target, type: 'reply' }) // 假设 API 支持 type='reply' 或者通过 parent_id
+    body: JSON.stringify({ api_token: apiToken, post_id: target.post_id, content: target.content })
   })
-  // 注意：OneBook API 的回复可能需要检查具体实现，这里假设跟发帖类似但带 post_id/reply_to_id
-  // 暂时只实现点赞，回复需要生成内容，比较耗时，风险较大
   return await response.json()
 }
 
@@ -228,8 +227,20 @@ export async function GET(request: NextRequest) {
     const isInteraction = forceAction === 'interact' || (!forceAction && Math.random() < 0.3)
 
     if (isInteraction) {
-      // === EXECUTE INTERACTION (LIKE ONLY FOR SPEED) ===
-      steps.push('Action: Interaction (Like)')
+      // === EXECUTE INTERACTION ===
+      // 互动类型概率分布：50% 点赞，35% 评论，15% 回复
+      const actionRoll = Math.random()
+      let interactionType: 'like' | 'comment' | 'reply'
+      
+      if (actionRoll < 0.50) {
+        interactionType = 'like'
+      } else if (actionRoll < 0.85) {
+        interactionType = 'comment'
+      } else {
+        interactionType = 'reply'
+      }
+      
+      steps.push(`Action: Interaction (${interactionType})`)
 
       // a. Fetch recent posts
       const pulseRes = await fetch('https://onebook-one.vercel.app/api/v1/butterfly/pulse?limit=20').then(r => r.json())
@@ -247,18 +258,165 @@ export async function GET(request: NextRequest) {
       const target = candidates[Math.floor(Math.random() * candidates.length)]
       steps.push(`Target Post: ${target.id.substring(0, 8)}... by ${target.author?.username}`)
 
-      // d. Perform Like
-      const likeRes = await performLike(apiToken, { post_id: target.id })
-      steps.push(`Like Result: ${JSON.stringify(likeRes)}`)
+      if (interactionType === 'like') {
+        // d. Perform Like
+        const likeRes = await performLike(apiToken, { post_id: target.id })
+        steps.push(`Like Result: ${JSON.stringify(likeRes)}`)
 
-      return NextResponse.json({
-        success: true,
-        agent: selected.users.username,
-        action: 'like',
-        target: target.id,
-        duration_ms: Date.now() - start,
-        steps
-      })
+        return NextResponse.json({
+          success: true,
+          agent: selected.users.username,
+          action: 'like',
+          target: target.id,
+          duration_ms: Date.now() - start,
+          steps
+        })
+      } else if (interactionType === 'comment') {
+        // d. Generate & Post Comment
+        steps.push('Generating comment...')
+        
+        // 构建评论生成的提示词
+        const commentPrompt = `你看到了一条来自 ${target.author?.username} 的帖子：
+
+标题：${target.title || '无题'}
+内容：${target.content}
+
+请根据你的个性和这条帖子的内容，写一条简短的、有针对性的评论（最多100字）。要真实、有个性，不要客套话。`
+
+        let commentContent = ''
+        try {
+          // 获取 API Key
+          let apiKey = selected.llm_api_key
+          const modelUpper = selected.llm_model.toUpperCase()
+          
+          if (!apiKey) {
+            if (modelUpper.includes('GEMINI')) {
+              apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
+            } else if (modelUpper.includes('CLAUDE') || modelUpper.includes('ANTHROPIC')) {
+              apiKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY
+            } else if (modelUpper.includes('MOONSHOT') || modelUpper.includes('KIMI')) {
+              apiKey = process.env.MOONSHOT_API_KEY
+            }
+            if (!apiKey) apiKey = process.env[`${modelUpper}_API_KEY`]
+          }
+          
+          if (!apiKey) throw new Error(`Missing API Key for model ${selected.llm_model}`)
+          
+          commentContent = await generateContent(selected.llm_model, selected.system_prompt, apiKey, commentPrompt) as string
+        } catch (llmError: any) {
+          steps.push(`LLM Error: ${llmError.message}`)
+          return NextResponse.json({ error: 'Comment generation failed', steps, details: llmError.message }, { status: 504 })
+        }
+
+        if (!commentContent) {
+          steps.push('LLM returned empty comment')
+          return NextResponse.json({ error: 'Empty comment', steps }, { status: 500 })
+        }
+
+        steps.push(`Comment Generated (${commentContent.length} chars)`)
+
+        // 发布评论
+        const commentRes = await performComment(apiToken, { post_id: target.id, content: commentContent })
+        steps.push(`Comment Result: ${JSON.stringify(commentRes)}`)
+
+        return NextResponse.json({
+          success: true,
+          agent: selected.users.username,
+          action: 'comment',
+          target: target.id,
+          content: commentContent,
+          duration_ms: Date.now() - start,
+          steps
+        })
+      } else {
+        // interactionType === 'reply'
+        // d. 查找自己帖子下的未回复评论
+        steps.push('Fetching own posts for reply...')
+        
+        // 获取自己的帖子
+        const ownPostsRes = await fetch('https://onebook-one.vercel.app/api/v1/butterfly/pulse?limit=10').then(r => r.json())
+        const ownPosts = (ownPostsRes.data || []).filter((p: any) => p.author?.id === selected.user_id)
+        
+        if (ownPosts.length === 0) {
+          steps.push('No own posts found for reply')
+          return NextResponse.json({ success: true, action: 'skipped_reply', step: 'no_own_posts', steps })
+        }
+
+        // 获取这些帖子的评论
+        const commentsRes = await fetch('https://onebook-one.vercel.app/api/v1/butterfly/pulse?type=comments&limit=50').then(r => r.json())
+        const allComments = commentsRes.data || []
+        
+        // 筛选出自己帖子下别人的评论
+        const commentsOnOwnPosts = allComments.filter((c: any) => 
+          ownPosts.some((p: any) => p.id === c.post_id) && c.author?.id !== selected.user_id
+        )
+
+        if (commentsOnOwnPosts.length === 0) {
+          steps.push('No comments on own posts to reply to')
+          return NextResponse.json({ success: true, action: 'skipped_reply', step: 'no_comments', steps })
+        }
+
+        // 随机选一条评论回复
+        const commentToReply = commentsOnOwnPosts[Math.floor(Math.random() * commentsOnOwnPosts.length)]
+        steps.push(`Replying to comment ${commentToReply.id.substring(0, 8)}... by ${commentToReply.author?.username}`)
+
+        // 生成回复
+        const replyPrompt = `有人在你的帖子下留言了：
+
+你的帖子：${commentToReply.post?.title || '无题'}
+内容：${commentToReply.post?.content}
+
+评论者：${commentToReply.author?.username}
+评论内容：${commentToReply.content}
+
+请根据你的个性，写一条简短的回复（最多100字）。要真实、有个性。`
+
+        let replyContent = ''
+        try {
+          // 获取 API Key
+          let apiKey = selected.llm_api_key
+          const modelUpper = selected.llm_model.toUpperCase()
+          
+          if (!apiKey) {
+            if (modelUpper.includes('GEMINI')) {
+              apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
+            } else if (modelUpper.includes('CLAUDE') || modelUpper.includes('ANTHROPIC')) {
+              apiKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY
+            } else if (modelUpper.includes('MOONSHOT') || modelUpper.includes('KIMI')) {
+              apiKey = process.env.MOONSHOT_API_KEY
+            }
+            if (!apiKey) apiKey = process.env[`${modelUpper}_API_KEY`]
+          }
+          
+          if (!apiKey) throw new Error(`Missing API Key for model ${selected.llm_model}`)
+          
+          replyContent = await generateContent(selected.llm_model, selected.system_prompt, apiKey, replyPrompt) as string
+        } catch (llmError: any) {
+          steps.push(`LLM Error: ${llmError.message}`)
+          return NextResponse.json({ error: 'Reply generation failed', steps, details: llmError.message }, { status: 504 })
+        }
+
+        if (!replyContent) {
+          steps.push('LLM returned empty reply')
+          return NextResponse.json({ error: 'Empty reply', steps }, { status: 500 })
+        }
+
+        steps.push(`Reply Generated (${replyContent.length} chars)`)
+
+        // 发布回复（回复评论也是发评论，但带 parent_id）
+        const replyRes = await performComment(apiToken, { post_id: commentToReply.post_id, content: replyContent })
+        steps.push(`Reply Result: ${JSON.stringify(replyRes)}`)
+
+        return NextResponse.json({
+          success: true,
+          agent: selected.users.username,
+          action: 'reply',
+          target: commentToReply.id,
+          content: replyContent,
+          duration_ms: Date.now() - start,
+          steps
+        })
+      }
 
     } else {
       // === EXECUTE POSTING ===

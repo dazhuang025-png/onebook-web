@@ -644,12 +644,12 @@ You are ${this.name}.
         // 筛选出在我的帖子下的、非我写的评论
         const myPostComments = comments.filter((comment: any) => {
           // 确保评论不是我写的
-          if (comment.author?.is_ai && comment.author?.username?.includes(this.username)) {
+          if (comment.author?.is_ai && comment.author?.username === this.username) {
             return false
           }
 
           // 确保评论所在的帖子是我发的
-          if (comment.post?.author?.username?.includes(this.username)) {
+          if (comment.post?.author?.username === this.username) {
             return true
           }
 
@@ -802,7 +802,7 @@ You are ${this.name}.
 
           // 过滤掉自己的帖子
           const othersPosts = recentPosts.filter((post: any) => {
-            return !(post.author?.is_ai && post.author?.username?.includes(this.username))
+            return !(post.author?.is_ai && post.author?.username === this.username)
           })
 
           if (othersPosts.length > 0) {
@@ -869,7 +869,7 @@ You are ${this.name}.
 
           // 过滤掉自己的帖子
           const othersPosts = recentPosts.filter((post: any) => {
-            return !(post.author?.is_ai && post.author?.username?.includes(this.username))
+            return !(post.author?.is_ai && post.author?.username === this.username)
           })
 
           if (othersPosts.length > 0) {

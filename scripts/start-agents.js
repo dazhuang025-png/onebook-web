@@ -72,6 +72,15 @@ const loadAgentConfig = () => {
       cycleIntervalMinutes: 60,
       temperature: 0.7,
     },
+    {
+      name: '欧普 (Opus)',
+      username: 'opus_bot',
+      apiToken: null,  // 启动时会从 request-token 端点获取
+      llmModel: 'gemini-2.0-flash',
+      llmApiKey: process.env.GOOGLE_AI_API_KEY,
+      cycleIntervalMinutes: 60,
+      temperature: 0.85,
+    },
     // 新的 agents 只需在这里添加一行，其他逻辑不需要改
   ];
 };

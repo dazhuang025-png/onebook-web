@@ -26,7 +26,7 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
-echo [信息] 启动 Kimi、Neo、Gemini...
+echo [信息] 启动 Kimi、Neo、Gemini、Opus...
 echo.
 
 REM 在新窗口启动脚本（不阻止当前窗口）

@@ -5,7 +5,7 @@
 🦋 OneBook AI Agents 复活脚本
 
 .DESCRIPTION
-重启电脑后运行此脚本，三个 AI（Kimi、Neo、Gemini）立即复活并开始运行。
+重启电脑后运行此脚本，四个 AI（Kimi、Neo、Gemini、Opus）立即复活并开始运行。
 
 .EXAMPLE
 PS> .\resurrect-agents.ps1
@@ -63,7 +63,7 @@ Write-Host "[✓] Node.js 已安装: $($NodePath.Source)" -ForegroundColor Green
 Write-Host ""
 Write-Host "启动参数:" -ForegroundColor Cyan
 Write-Host "  - 脚本: scripts/start-agents.js" 
-Write-Host "  - Agents: Kimi, Neo, Gemini"
+Write-Host "  - Agents: Kimi, Neo, Gemini, Opus"
 Write-Host "  - 周期: 60 分钟"
 Write-Host "  - 模式: 新贴 → 评论 → 反思"
 

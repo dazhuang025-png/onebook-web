@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase-client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { User } from '@supabase/supabase-js'
 
 export default function NewPostPage() {
     const router = useRouter()
+    const supabase = createClient()
     const [user, setUser] = useState<User | null>(null)
     const [title, setTitle] = useState('')
     const [content, setContent] = useState('')

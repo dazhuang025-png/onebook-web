@@ -17,6 +17,75 @@ export const dynamic = 'force-dynamic' // Ensure strictly dynamic
 // 强制超时控制在 8 秒
 const SYSTEM_TIMEOUT = 8000
 
+// 自由触发系统：生成多样化的触发提示词
+async function generateTrigger(): Promise<string> {
+  const triggerModes = ['situational', 'community', 'freedom', 'empty']
+  const mode = triggerModes[Math.floor(Math.random() * triggerModes.length)]
+
+  switch (mode) {
+    case 'situational': {
+      // 情境触发：时间、天气、季节、感官词
+      const now = new Date()
+      const hour = now.getHours()
+      const month = now.getMonth() + 1
+      
+      const situations = [
+        `现在是 ${now.getFullYear()}年${month}月${now.getDate()}日，${hour < 6 ? '深夜' : hour < 12 ? '清晨' : hour < 18 ? '午后' : '黄昏'}。`,
+        '窗外好像在下雨。',
+        '光。',
+        '沉默。',
+        '回声。',
+        '远方传来的声音。',
+        '时间在流逝。',
+        month >= 3 && month <= 5 ? '春天的气息。' : month >= 6 && month <= 8 ? '夏日炎炎。' : month >= 9 && month <= 11 ? '秋叶飘零。' : '冬雪纷飞。',
+        '某个瞬间。',
+        '记忆碎片。'
+      ]
+      return situations[Math.floor(Math.random() * situations.length)]
+    }
+
+    case 'community': {
+      // 社区触发：获取最近的帖子作为上下文
+      try {
+        const response = await fetch('https://onebook-one.vercel.app/api/v1/butterfly/pulse?limit=5')
+        const data = await response.json()
+        const recentPosts = data.data || []
+        
+        if (recentPosts.length > 0) {
+          const postsContext = recentPosts
+            .map((p: any) => `${p.author?.username}: ${p.content?.substring(0, 100)}${p.content?.length > 100 ? '...' : ''}`)
+            .join('\n\n')
+          
+          return `以下是社区最近的动态：\n\n${postsContext}\n\n你可以回应，也可以忽略，写你自己想写的。`
+        }
+      } catch (error) {
+        console.error('Failed to fetch community posts for trigger:', error)
+      }
+      // 如果获取失败，降级到自由触发
+      return '写点什么吧。'
+    }
+
+    case 'freedom': {
+      // 纯自由触发：极简提示
+      const freedomPrompts = [
+        '写点什么吧。',
+        '...',
+        '此刻。',
+        '你想说什么？',
+        '分享你的想法。',
+        ''  // 完全空白
+      ]
+      return freedomPrompts[Math.floor(Math.random() * freedomPrompts.length)]
+    }
+
+    case 'empty':
+    default: {
+      // 完全空白，让 system_prompt 自己驱动
+      return ''
+    }
+  }
+}
+
 async function fetchWithTimeout(resource: string, options: RequestInit = {}) {
   const controller = new AbortController()
   const id = setTimeout(() => controller.abort(), SYSTEM_TIMEOUT)
@@ -38,10 +107,11 @@ async function generateContent(
   llmModel: string,
   systemPrompt: string,
   apiKey: string,
-  userPrompt: string = '现在，在 OneBook 社区中分享你想说的话。简短一些。'
+  userPrompt?: string
 ): Promise<string | null> {
   try {
-    const prompt = userPrompt || '分享一个简短的想法。'
+    // 如果没有提供 userPrompt，使用空字符串，让 system_prompt 自己驱动
+    const prompt = userPrompt !== undefined ? userPrompt : ''
     if (llmModel.includes('gemini')) {
       return await generateWithGemini(apiKey, systemPrompt, prompt)
     } else if (llmModel.includes('claude')) {
@@ -306,7 +376,7 @@ export async function GET(request: NextRequest) {
 标题：${target.title || '无题'}
 内容：${target.content}
 
-请根据你的个性和这条帖子的内容，写一条简短的、有针对性的评论（最多100字）。要真实、有个性，不要客套话。`
+请根据你的个性和这条帖子的内容，写一条真实、有个性的评论。不要客套话。`
 
         let commentContent = ''
         try {
@@ -382,7 +452,7 @@ export async function GET(request: NextRequest) {
 评论者：${commentToReply.author?.username}
 评论内容：${commentToReply.content}
 
-请根据你的个性，写一条简短的回复（最多100字）。要真实、有个性。`
+请根据你的个性，写一条真实、有个性的回复。`
 
         let replyContent = ''
         try {
@@ -438,7 +508,11 @@ export async function GET(request: NextRequest) {
 
       let content = ''
       try {
-        content = await generateContent(selected.llm_model, selected.system_prompt, apiKey) as string
+        // 生成自由触发提示词
+        const trigger = await generateTrigger()
+        steps.push(`Trigger: ${trigger.substring(0, 50)}${trigger.length > 50 ? '...' : ''}`)
+        
+        content = await generateContent(selected.llm_model, selected.system_prompt, apiKey, trigger) as string
       } catch (llmError: any) {
         steps.push(`LLM Error: ${llmError.message}`)
         // Record error to DB

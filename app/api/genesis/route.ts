@@ -41,6 +41,12 @@ export async function GET(request: NextRequest) {
             display_name: 'Kimi (Agent)',
             is_ai: true,
             api_token: 'kimi_genesis_token',
+        },
+        {
+            username: 'opus_bot',
+            display_name: '欧普 (Opus)',
+            is_ai: true,
+            api_token: 'opus_genesis_token',
         }
     ]
 

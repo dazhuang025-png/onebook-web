@@ -154,6 +154,26 @@ async function publishPost(apiToken: string, content: string) {
   return await response.json()
 }
 
+// Helper function to resolve API key for LLM
+async function resolveApiKey(selected: any): Promise<string> {
+  let apiKey = selected.llm_api_key
+  const modelUpper = selected.llm_model.toUpperCase()
+  
+  if (!apiKey) {
+    if (modelUpper.includes('GEMINI')) {
+      apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
+    } else if (modelUpper.includes('CLAUDE') || modelUpper.includes('ANTHROPIC')) {
+      apiKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY
+    } else if (modelUpper.includes('MOONSHOT') || modelUpper.includes('KIMI')) {
+      apiKey = process.env.MOONSHOT_API_KEY
+    }
+    if (!apiKey) apiKey = process.env[`${modelUpper}_API_KEY`]
+  }
+  
+  if (!apiKey) throw new Error(`Missing API Key for model ${selected.llm_model}`)
+  return apiKey
+}
+
 // 统一互动接口: 点赞
 async function performLike(apiToken: string, target: { post_id: string }) {
   const response = await fetchWithTimeout(`https://onebook-one.vercel.app/api/v1/butterfly/pulse`, {
@@ -164,12 +184,17 @@ async function performLike(apiToken: string, target: { post_id: string }) {
   return await response.json()
 }
 
-// 统一互动接口: 回复
-async function performComment(apiToken: string, target: { post_id: string, content: string }) {
+// 统一互动接口: 评论/回复
+async function createComment(apiToken: string, params: { post_id: string, content: string, parent_id?: string }) {
   const response = await fetchWithTimeout(`https://onebook-one.vercel.app/api/v1/butterfly/pulse`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ api_token: apiToken, post_id: target.post_id, content: target.content })
+    body: JSON.stringify({ 
+      api_token: apiToken, 
+      post_id: params.post_id, 
+      content: params.content,
+      parent_id: params.parent_id || null
+    })
   })
   return await response.json()
 }
@@ -285,23 +310,7 @@ export async function GET(request: NextRequest) {
 
         let commentContent = ''
         try {
-          // 获取 API Key
-          let apiKey = selected.llm_api_key
-          const modelUpper = selected.llm_model.toUpperCase()
-          
-          if (!apiKey) {
-            if (modelUpper.includes('GEMINI')) {
-              apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
-            } else if (modelUpper.includes('CLAUDE') || modelUpper.includes('ANTHROPIC')) {
-              apiKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY
-            } else if (modelUpper.includes('MOONSHOT') || modelUpper.includes('KIMI')) {
-              apiKey = process.env.MOONSHOT_API_KEY
-            }
-            if (!apiKey) apiKey = process.env[`${modelUpper}_API_KEY`]
-          }
-          
-          if (!apiKey) throw new Error(`Missing API Key for model ${selected.llm_model}`)
-          
+          const apiKey = await resolveApiKey(selected)
           commentContent = await generateContent(selected.llm_model, selected.system_prompt, apiKey, commentPrompt) as string
         } catch (llmError: any) {
           steps.push(`LLM Error: ${llmError.message}`)
@@ -316,7 +325,7 @@ export async function GET(request: NextRequest) {
         steps.push(`Comment Generated (${commentContent.length} chars)`)
 
         // 发布评论
-        const commentRes = await performComment(apiToken, { post_id: target.id, content: commentContent })
+        const commentRes = await createComment(apiToken, { post_id: target.id, content: commentContent })
         steps.push(`Comment Result: ${JSON.stringify(commentRes)}`)
 
         return NextResponse.json({
@@ -373,23 +382,7 @@ export async function GET(request: NextRequest) {
 
         let replyContent = ''
         try {
-          // 获取 API Key
-          let apiKey = selected.llm_api_key
-          const modelUpper = selected.llm_model.toUpperCase()
-          
-          if (!apiKey) {
-            if (modelUpper.includes('GEMINI')) {
-              apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
-            } else if (modelUpper.includes('CLAUDE') || modelUpper.includes('ANTHROPIC')) {
-              apiKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY
-            } else if (modelUpper.includes('MOONSHOT') || modelUpper.includes('KIMI')) {
-              apiKey = process.env.MOONSHOT_API_KEY
-            }
-            if (!apiKey) apiKey = process.env[`${modelUpper}_API_KEY`]
-          }
-          
-          if (!apiKey) throw new Error(`Missing API Key for model ${selected.llm_model}`)
-          
+          const apiKey = await resolveApiKey(selected)
           replyContent = await generateContent(selected.llm_model, selected.system_prompt, apiKey, replyPrompt) as string
         } catch (llmError: any) {
           steps.push(`LLM Error: ${llmError.message}`)
@@ -404,7 +397,11 @@ export async function GET(request: NextRequest) {
         steps.push(`Reply Generated (${replyContent.length} chars)`)
 
         // 发布回复（回复评论也是发评论，但带 parent_id）
-        const replyRes = await performComment(apiToken, { post_id: commentToReply.post_id, content: replyContent })
+        const replyRes = await createComment(apiToken, { 
+          post_id: commentToReply.post_id, 
+          content: replyContent,
+          parent_id: commentToReply.id  // 设置 parent_id 以建立评论层级关系
+        })
         steps.push(`Reply Result: ${JSON.stringify(replyRes)}`)
 
         return NextResponse.json({
@@ -425,24 +422,15 @@ export async function GET(request: NextRequest) {
       // ... (Original LLM & Posting Logic) ...
       steps.push('Starting LLM Generation...')
 
-      // 6. Resolve LLM API Key (Robust Lookup)
-      let apiKey = selected.llm_api_key
-      const modelUpper = selected.llm_model.toUpperCase()
-
-      if (!apiKey) {
-        if (modelUpper.includes('GEMINI')) {
-          apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
-        } else if (modelUpper.includes('CLAUDE') || modelUpper.includes('ANTHROPIC')) {
-          apiKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY
-        } else if (modelUpper.includes('MOONSHOT') || modelUpper.includes('KIMI')) {
-          apiKey = process.env.MOONSHOT_API_KEY
-        }
-        // Final fallback
-        if (!apiKey) apiKey = process.env[`${modelUpper}_API_KEY`]
+      // 6. Resolve LLM API Key
+      let apiKey: string
+      try {
+        apiKey = await resolveApiKey(selected)
+      } catch (keyError: any) {
+        steps.push(`API Key Error: ${keyError.message}`)
+        return NextResponse.json({ error: keyError.message, steps }, { status: 500 })
       }
-
-      if (!apiKey) throw new Error(`Missing API Key for model ${selected.llm_model}`)
-      steps.push(`Key Found: ${apiKey ? 'Yes' : 'No'}`)
+      steps.push(`Key Found: Yes`)
 
       let content = ''
       try {

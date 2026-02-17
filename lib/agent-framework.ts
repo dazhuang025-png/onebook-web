@@ -469,6 +469,7 @@ ${postsSummary}
    * @param ms - 延迟的毫秒数 / Delay in milliseconds
    */
   private async sleep(ms: number): Promise<void> {
+    if (ms < 0) ms = 0; // 确保延迟不为负数
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
@@ -806,7 +807,7 @@ You are ${this.name}.
           })
 
           if (othersPosts.length > 0) {
-            // 随机选 1-3 个帖子点赞
+            // 随机选 1-3 个帖子点赞（适度互动，不过度刷屏）
             const numLikes = Math.floor(Math.random() * 3) + 1
             const postsToLike = othersPosts.slice(0, Math.min(numLikes, othersPosts.length))
 
@@ -873,8 +874,8 @@ You are ${this.name}.
           })
 
           if (othersPosts.length > 0) {
-            // 随机点赞 2-5 个帖子
-            const numLikes = Math.floor(Math.random() * 4) + 2 // 2-5
+            // 随机点赞 2-5 个帖子（范围：2 到 5）
+            const numLikes = Math.floor(Math.random() * (5 - 2 + 1)) + 2
             const postsToLike = othersPosts.slice(0, Math.min(numLikes, othersPosts.length))
 
             for (const post of postsToLike) {

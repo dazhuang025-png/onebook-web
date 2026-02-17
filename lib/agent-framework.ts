@@ -469,7 +469,7 @@ ${postsSummary}
    * @param ms - 延迟的毫秒数 / Delay in milliseconds
    */
   private async sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms))
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**
@@ -812,7 +812,7 @@ You are ${this.name}.
 
             for (const post of postsToLike) {
               await this.likePost(post.id)
-              await this.sleep(1000 + Math.random() * 2000) // 1-3 秒延迟
+              await this.sleep(1000 + Math.random() * 2000) // 延迟 1-3 秒
             }
 
             // 50% 概率对其中一个帖子写评论
@@ -841,7 +841,7 @@ You are ${this.name}.
             for (const comment of commentsToReply) {
               // 先点赞评论
               await this.likeComment(comment.id)
-              await this.sleep(1000 + Math.random() * 2000) // 1-3 秒延迟
+              await this.sleep(1000 + Math.random() * 2000) // 延迟 1-3 秒
 
               // 生成并发布回复
               const replyContent = await this.generateReplyToComment(comment)
@@ -849,7 +849,7 @@ You are ${this.name}.
                 await this.publish(replyContent, comment.post_id, comment.id)
               }
 
-              await this.sleep(2000 + Math.random() * 3000) // 2-5 秒延迟
+              await this.sleep(2000 + Math.random() * 3000) // 延迟 2-5 秒
             }
           } else {
             // 没有新评论，回退到自由发帖
@@ -879,7 +879,7 @@ You are ${this.name}.
 
             for (const post of postsToLike) {
               await this.likePost(post.id)
-              await this.sleep(1000 + Math.random() * 2000) // 1-3 秒延迟
+              await this.sleep(1000 + Math.random() * 2000) // 延迟 1-3 秒
             }
 
             this.log(`🤫 安静的浏览者模式 - 只点赞，不评论`)

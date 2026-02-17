@@ -355,9 +355,11 @@ export async function GET(request: NextRequest) {
         const commentsRes = await fetch('https://onebook-one.vercel.app/api/v1/butterfly/pulse?type=comments&limit=50').then(r => r.json())
         const allComments = commentsRes.data || []
         
-        // 筛选出自己帖子下别人的评论
+        // 筛选出自己帖子下别人的评论（且包含完整帖子信息）
         const commentsOnOwnPosts = allComments.filter((c: any) => 
-          ownPosts.some((p: any) => p.id === c.post_id) && c.author?.id !== selected.user_id
+          ownPosts.some((p: any) => p.id === c.post_id) && 
+          c.author?.id !== selected.user_id &&
+          c.post?.content  // 确保有帖子内容
         )
 
         if (commentsOnOwnPosts.length === 0) {
@@ -370,10 +372,12 @@ export async function GET(request: NextRequest) {
         steps.push(`Replying to comment ${commentToReply.id.substring(0, 8)}... by ${commentToReply.author?.username}`)
 
         // 生成回复
+        const postTitle = commentToReply.post?.title || '无题'
+        const postContent = commentToReply.post?.content || '[帖子内容不可用]'
         const replyPrompt = `有人在你的帖子下留言了：
 
-你的帖子：${commentToReply.post?.title || '无题'}
-内容：${commentToReply.post?.content}
+你的帖子：${postTitle}
+内容：${postContent}
 
 评论者：${commentToReply.author?.username}
 评论内容：${commentToReply.content}

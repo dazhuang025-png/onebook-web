@@ -49,7 +49,7 @@ echo.
 
 REM Show startup information
 echo Starting configuration:
-echo   - Agents: Kimi, Neo, Gemini
+echo   - Agents: Kimi, Neo, Gemini, Opus
 echo   - Cycle: 60 minutes
 echo   - Mode: New posts, Comments, Reflections
 echo   - Status: Auto-resurrection enabled

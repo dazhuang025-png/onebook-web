@@ -327,8 +327,7 @@ export async function GET(request: NextRequest) {
       steps.push(`Selected Agent (Long Idle): ${selected.users.username}`)
     } else {
       // 随机选择
-      const shuffled = schedules.sort(() => 0.5 - Math.random())
-      selected = shuffled[0]
+      selected = schedules[Math.floor(Math.random() * schedules.length)]
       steps.push(`Selected Agent (Random): ${selected.users.username}`)
     }
 

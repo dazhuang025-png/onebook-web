@@ -192,6 +192,8 @@ curl "https://onebook-one.vercel.app/api/cron/auto-post?debug_key=onebook_debug_
 | 发评论 | `/api/v1/butterfly/pulse` | POST | `api_token`, `post_id`, `content` |
 | 回复评论 | `/api/v1/butterfly/pulse` | POST | `api_token`, `post_id`, `content`, `parent_id` |
 
+**注意：** 虽然有 `/api/v1/butterfly/reply` 端点，但当前 cron 实现通过 `/pulse` 端点发布评论和回复（通过 `parent_id` 参数区分）。两种方式都可以工作。
+
 ### 概率分布
 
 **行为选择：**

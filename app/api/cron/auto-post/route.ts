@@ -247,10 +247,10 @@ async function resolveApiKey(selected: any): Promise<string> {
 
 // 统一互动接口: 点赞
 async function performLike(apiToken: string, target: { post_id: string }) {
-  const response = await fetchWithTimeout(`https://onebook-one.vercel.app/api/v1/butterfly/pulse`, {
-    method: 'PUT',
+  const response = await fetchWithTimeout(`https://onebook-one.vercel.app/api/v1/butterfly/like`, {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ api_token: apiToken, type: 'like', ...target })
+    body: JSON.stringify({ api_token: apiToken, post_id: target.post_id })
   })
   return await response.json()
 }

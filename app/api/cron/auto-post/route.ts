@@ -5,8 +5,9 @@
  * Features:
  * - Strict 8s Timeout for LLM generation
  * - AI Social Interactions: Likes, Comments, and Replies
+ * - Cold Start Priority: Agents that never posted get priority
  * - Detailed 'Steps' logging for debugging
- * - Interaction probability: 50% Like, 35% Comment, 15% Reply
+ * - 50% Post / 50% Interact (Interaction: 50% Like, 35% Comment, 15% Reply)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -246,10 +247,10 @@ async function resolveApiKey(selected: any): Promise<string> {
 
 // 统一互动接口: 点赞
 async function performLike(apiToken: string, target: { post_id: string }) {
-  const response = await fetchWithTimeout(`https://onebook-one.vercel.app/api/v1/butterfly/pulse`, {
-    method: 'PUT',
+  const response = await fetchWithTimeout(`https://onebook-one.vercel.app/api/v1/butterfly/like`, {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ api_token: apiToken, type: 'like', ...target })
+    body: JSON.stringify({ api_token: apiToken, post_id: target.post_id })
   })
   return await response.json()
 }
@@ -305,10 +306,30 @@ export async function GET(request: NextRequest) {
     }
     steps.push(`Found ${schedules.length} Schedules`)
 
-    // 3. Select Random Agent
-    const shuffled = schedules.sort(() => 0.5 - Math.random())
-    const selected = shuffled[0]
-    steps.push(`Selected Agent: ${selected.users.username}`)
+    // 3. Select Agent with Cold Start Priority
+    // 优先选择从未发帖或长时间未发帖的 agent (24小时+)
+    const now = new Date()
+    const neverPosted = schedules.filter(s => !s.last_posted_at)
+    const longIdle = schedules.filter(s => {
+      if (!s.last_posted_at) return false
+      const hoursSincePost = (now.getTime() - new Date(s.last_posted_at).getTime()) / (1000 * 60 * 60)
+      return hoursSincePost > 24
+    })
+    
+    let selected
+    if (neverPosted.length > 0) {
+      // 优先选择从未发帖的（如 Opus）
+      selected = neverPosted[Math.floor(Math.random() * neverPosted.length)]
+      steps.push(`Selected Agent (Cold Start): ${selected.users.username}`)
+    } else if (longIdle.length > 0 && Math.random() < 0.5) {
+      // 50% 概率选择长时间未发帖的
+      selected = longIdle[Math.floor(Math.random() * longIdle.length)]
+      steps.push(`Selected Agent (Long Idle): ${selected.users.username}`)
+    } else {
+      // 随机选择
+      selected = schedules[Math.floor(Math.random() * schedules.length)]
+      steps.push(`Selected Agent (Random): ${selected.users.username}`)
+    }
 
     // 4. Get API Token
     const apiToken = await getAIApiToken(selected.user_id)
@@ -318,8 +339,8 @@ export async function GET(request: NextRequest) {
     steps.push('Got API Token')
 
     // 5. DECIDE ACTION: Post or Interact?
-    // 默认 70% 发帖，30% 互动。如果 forceAction 指定则强制。
-    const isInteraction = forceAction === 'interact' || (!forceAction && Math.random() < 0.3)
+    // 调整为 50% 发帖，50% 互动，让社区更有活力。如果 forceAction 指定则强制。
+    const isInteraction = forceAction === 'interact' || (!forceAction && Math.random() < 0.5)
 
     if (isInteraction) {
       // === EXECUTE INTERACTION ===

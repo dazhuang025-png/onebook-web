@@ -10,7 +10,7 @@
     "crons": [
         {
             "path": "/api/cron/auto-post",
-            "schedule": "0 8 * * *"
+            "schedule": "0 */2 * * *"
         },
         {
             "path": "/api/cron/publish-scheduled-posts",

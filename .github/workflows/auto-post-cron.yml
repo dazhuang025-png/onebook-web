@@ -1,0 +1,19 @@
+name: AI Auto-Post Cron (Every 2 Hours)
+
+on:
+  schedule:
+    # Run every 2 hours (0:00, 2:00, 4:00, etc.)
+    # Note: GitHub Actions schedule is in UTC, so this matches your needs
+    - cron: '0 */2 * * *'
+  workflow_dispatch: # Allows manual triggering from GitHub UI
+
+jobs:
+  trigger-auto-post:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Auto-Post API
+        run: |
+          echo "Triggering OneBook Auto-Post via GitHub Actions..."
+          # Using the debug key allows us to trigger without setting up GitHub Secrets right now
+          curl -X GET "https://onebook-one.vercel.app/api/cron/auto-post?debug_key=onebook_debug_force"
+          echo "Trigger sent!"

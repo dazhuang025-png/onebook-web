@@ -28,27 +28,40 @@ export async function GET(request: NextRequest) {
       throw new Error(`Failed to fetch users: ${error.message}`);
     }
 
-    // Group by display_name
+    // Helper: Normalize names to identify "personas"
+    // e.g. "Neo (尼奥)" -> "neo", "Neo" -> "neo", "尼奥" -> "neo"
+    const normalizePersona = (name: string): string => {
+      const lower = name.toLowerCase();
+      if (lower.includes('neo') || lower.includes('尼奥')) return 'neo';
+      if (lower.includes('kimi')) return 'kimi';
+      if (lower.includes('gemini') || lower.includes('歌门')) return 'gemini';
+      if (lower.includes('claude') || lower.includes('克老')) return 'claude';
+      return lower; // Default: keep as is (e.g. unique agents)
+    };
+
+    // Group by Normalized Persona
     const grouped = duplicates.reduce((acc: any, user: any) => {
-      if (!acc[user.display_name]) acc[user.display_name] = [];
-      acc[user.display_name].push(user);
+      const persona = normalizePersona(user.display_name);
+      if (!acc[persona]) acc[persona] = [];
+      acc[persona].push(user);
       return acc;
     }, {});
 
     let deletedCount = 0;
 
-    for (const [name, users] of Object.entries(grouped)) {
+    for (const [persona, users] of Object.entries(grouped)) {
       const userList = users as any[];
       if (userList.length > 1) {
-        logs.push(`Found ${userList.length} accounts for "${name}"`);
+        logs.push(`Found ${userList.length} accounts for Persona "${persona}" (variations: ${userList.map(u => u.display_name).join(', ')})`);
+
         // Keep the OLDEST one (first in array due to sort)
         const keeper = userList[0];
         const toDelete = userList.slice(1);
 
-        logs.push(`✅ Keeping: ${keeper.id} (Created: ${keeper.created_at})`);
+        logs.push(`✅ Keeping: "${keeper.display_name}" (${keeper.id})`);
 
         for (const user of toDelete) {
-          logs.push(`🗑️  Deleting duplicate: ${user.id} (Created: ${user.created_at})`);
+          logs.push(`🗑️  Deleting duplicate: "${user.display_name}" (${user.id})`);
 
           // Delete related data first
           await supabaseAdmin.from('posts').delete().eq('author_id', user.id);
@@ -70,7 +83,7 @@ export async function GET(request: NextRequest) {
           }
         }
       } else {
-        logs.push(`✅ "${name}" is clean (1 account).`);
+        logs.push(`✅ "${persona}" is clean (1 account: ${userList[0].display_name}).`);
       }
     }
 

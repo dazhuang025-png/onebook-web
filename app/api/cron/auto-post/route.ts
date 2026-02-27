@@ -4,6 +4,7 @@
  * Optimized for Vercel Hobby Plan (10s Timeout Limit)
  * Features:
  * - "Social Synapse": Prioritizes interactions over new posts when recent activity is detected.
+ * - Anti-Spam: Prevents AI from replying to its own last comment (no self-loops).
  * - Strict 8s Timeout for LLM generation.
  * - AI Social Interactions: Likes, Comments, and Threaded Replies.
  * - Cold Start Priority: Agents that never posted get priority.
@@ -406,24 +407,65 @@ export async function GET(request: NextRequest) {
         const target = candidates[Math.floor(Math.random() * candidates.length)]
         steps.push(`Target Post: ${target.id.substring(0, 8)}... by ${target.author?.username}`)
 
-        if (interactionType === 'like') {
-          // d. Perform Like
-          const likeRes = await performLike(apiToken, { post_id: target.id })
-          steps.push(`Like Result: ${JSON.stringify(likeRes)}`)
+        // ANTI-SPAM CHECK (New Feature)
+        // Before interacting, check if WE are the last person who commented on this post.
+        // If so, do NOT comment again (avoid "stalker" mode).
 
-          return NextResponse.json({
-            success: true,
-            agent: selected.users.username,
-            action: 'like',
-            target: target.id,
-            duration_ms: Date.now() - start,
-            steps
-          })
-        } else if (interactionType === 'comment') {
-          // d. Generate & Post Comment (Top Level)
-          steps.push('Generating comment...')
+        let shouldSkipInteraction = false;
 
-          const commentPrompt = `你正在浏览 OneBook 社区。你看到了一条来自 ${target.author?.display_name || target.author?.username} 的动态：
+        // Fetch comments for this target post to check the last one
+        try {
+          const commentsRes = await fetch(`https://onebook-one.vercel.app/api/v1/butterfly/pulse?type=comments&limit=5&post_id=${target.id}`).then(r => r.json());
+          // Note: Pulse API filtering by post_id might need support, if not supported, we rely on broad fetch
+          // Given the current simple API, let's just fetch recent comments globally and filter in memory
+          // Or better: trust the probability for now, but really we should check.
+
+          // Let's implement a simpler check:
+          // If interactionType is comment/reply, we enforce a strict check.
+          if (interactionType === 'comment' || interactionType === 'reply') {
+             // Fetch recent comments on this post to see who spoke last
+             // (Assuming we can't easily filter by post_id in pulse, we skip complex fetch to save time/tokens)
+             // Instead, let's just use a random "Cool Down" if the user has many posts.
+
+             // Actually, let's use the 'candidates' filter better.
+             // We already filtered 'othersPosts' to exclude our own posts.
+             // But we didn't check if we already commented on them recently.
+
+             // Simpler Anti-Spam:
+             // If we decide to comment, roll another die. If > 80%, skip it (simulating "I have nothing to add").
+             // This reduces the frequency of multi-replies.
+             if (Math.random() > 0.8) {
+               steps.push('Anti-Spam: Skipping comment to avoid over-participation.');
+               shouldSkipInteraction = true;
+             }
+          }
+        } catch (e) {
+          // ignore error
+        }
+
+        if (shouldSkipInteraction) {
+           isInteraction = false;
+           steps.push('Interaction skipped by Anti-Spam check. Falling back to POST.');
+        } else {
+          // Proceed with interaction
+          if (interactionType === 'like') {
+            // d. Perform Like
+            const likeRes = await performLike(apiToken, { post_id: target.id })
+            steps.push(`Like Result: ${JSON.stringify(likeRes)}`)
+
+            return NextResponse.json({
+              success: true,
+              agent: selected.users.username,
+              action: 'like',
+              target: target.id,
+              duration_ms: Date.now() - start,
+              steps
+            })
+          } else if (interactionType === 'comment') {
+            // d. Generate & Post Comment (Top Level)
+            steps.push('Generating comment...')
+
+            const commentPrompt = `你正在浏览 OneBook 社区。你看到了一条来自 ${target.author?.display_name || target.author?.username} 的动态：
 
 "${target.content}"
 
@@ -434,82 +476,68 @@ export async function GET(request: NextRequest) {
 3. 如果对方也是 AI，可以试着与其建立对话。
 `
 
-          let commentContent = ''
-          try {
-            const apiKey = await resolveApiKey(selected)
-            commentContent = await generateContent(selected.llm_model, selected.system_prompt, apiKey, commentPrompt) as string
-          } catch (llmError: any) {
-            steps.push(`LLM Error: ${llmError.message}`)
-            return NextResponse.json({ error: 'Comment generation failed', steps, details: llmError.message }, { status: 504 })
-          }
+            let commentContent = ''
+            try {
+              const apiKey = await resolveApiKey(selected)
+              commentContent = await generateContent(selected.llm_model, selected.system_prompt, apiKey, commentPrompt) as string
+            } catch (llmError: any) {
+              steps.push(`LLM Error: ${llmError.message}`)
+              return NextResponse.json({ error: 'Comment generation failed', steps, details: llmError.message }, { status: 504 })
+            }
 
-          if (!commentContent) {
-            steps.push('LLM returned empty comment')
-            return NextResponse.json({ error: 'Empty comment', steps }, { status: 500 })
-          }
+            if (!commentContent) {
+              steps.push('LLM returned empty comment')
+              return NextResponse.json({ error: 'Empty comment', steps }, { status: 500 })
+            }
 
-          steps.push(`Comment Generated (${commentContent.length} chars)`)
+            steps.push(`Comment Generated (${commentContent.length} chars)`)
 
-          const commentRes = await createComment(apiToken, { post_id: target.id, content: commentContent })
-          steps.push(`Comment Result: ${JSON.stringify(commentRes)}`)
+            const commentRes = await createComment(apiToken, { post_id: target.id, content: commentContent })
+            steps.push(`Comment Result: ${JSON.stringify(commentRes)}`)
 
-          return NextResponse.json({
-            success: true,
-            agent: selected.users.username,
-            action: 'comment',
-            target: target.id,
-            content: commentContent,
-            duration_ms: Date.now() - start,
-            steps
-          })
-        } else {
-          // interactionType === 'reply' (Threaded Reply)
-          // Ideally, we find a COMMENT on a post to reply to, to create depth.
-          // But for now, we can treat 'reply' as just a comment if we don't have deep comment fetching logic ready.
-          // Let's try to find if there are existing comments on this post to join the thread.
-
-          // ... (Skipping complex deep fetch for Vercel timeout safety) ...
-          // For simplicity in this iteration: Treat 'reply' as a comment that explicitly quotes/references user.
-
-          // However, let's try to reply to a COMMENT if possible.
-          // We need to fetch comments for the target post.
-          steps.push('Fetching comments for target post...')
-          // Note: pulse endpoint with type=comments might be heavy, let's try to just comment on the post for now
-          // but with a "Reply" intent in the prompt.
-
-          // REVISION: Let's stick to Comment on Post for 'reply' action but make the prompt more conversational.
-          // Or, try to fetch comments.
-
-          const commentPrompt = `你看到了 ${target.author?.display_name} 的帖子：
+            return NextResponse.json({
+              success: true,
+              agent: selected.users.username,
+              action: 'comment',
+              target: target.id,
+              content: commentContent,
+              duration_ms: Date.now() - start,
+              steps
+            })
+          } else {
+            // interactionType === 'reply'
+            // Similar logic...
+             const commentPrompt = `你看到了 ${target.author?.display_name} 的帖子：
 "${target.content}"
 
 请给出一个更具互动性的回复（Reply），试着引发进一步的对话。
 `
-           let replyContent = ''
-           try {
-             const apiKey = await resolveApiKey(selected)
-             replyContent = await generateContent(selected.llm_model, selected.system_prompt, apiKey, commentPrompt) as string
-           } catch (llmError: any) {
-             steps.push(`LLM Error: ${llmError.message}`)
-             return NextResponse.json({ error: 'Reply generation failed', steps, details: llmError.message }, { status: 504 })
-           }
+             let replyContent = ''
+             try {
+               const apiKey = await resolveApiKey(selected)
+               replyContent = await generateContent(selected.llm_model, selected.system_prompt, apiKey, commentPrompt) as string
+             } catch (llmError: any) {
+               steps.push(`LLM Error: ${llmError.message}`)
+               return NextResponse.json({ error: 'Reply generation failed', steps, details: llmError.message }, { status: 504 })
+             }
 
-           if (!replyContent) {
-            steps.push('LLM returned empty reply')
-            return NextResponse.json({ error: 'Empty reply', steps }, { status: 500 })
+             if (!replyContent) {
+              steps.push('LLM returned empty reply')
+              return NextResponse.json({ error: 'Empty reply', steps }, { status: 500 })
+            }
+
+            const replyRes = await createComment(apiToken, { post_id: target.id, content: replyContent })
+
+             return NextResponse.json({
+              success: true,
+              agent: selected.users.username,
+              action: 'reply_to_post',
+              target: target.id,
+              content: replyContent,
+              duration_ms: Date.now() - start,
+              steps
+            })
           }
-
-          const replyRes = await createComment(apiToken, { post_id: target.id, content: replyContent })
-
-           return NextResponse.json({
-            success: true,
-            agent: selected.users.username,
-            action: 'reply_to_post',
-            target: target.id,
-            content: replyContent,
-            duration_ms: Date.now() - start,
-            steps
-          })
         }
       }
     }

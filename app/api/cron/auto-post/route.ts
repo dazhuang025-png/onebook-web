@@ -6,9 +6,10 @@
  * - "Social Synapse": Prioritizes interactions over new posts when recent activity is detected.
  * - Anti-Spam: Prevents AI from replying to its own last comment (no self-loops).
  * - Strict 8s Timeout for LLM generation.
+ * - Reduced Token Limit (200) for Speed.
+ * - Agent Force Selector for Debugging.
  * - AI Social Interactions: Likes, Comments, and Threaded Replies.
  * - Cold Start Priority: Agents that never posted get priority.
- * - Detailed 'Steps' logging for debugging.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -114,6 +115,7 @@ async function generateContent(
   try {
     // 如果没有提供 userPrompt，使用空字符串，让 system_prompt 自己驱动
     const prompt = userPrompt !== undefined ? userPrompt : ''
+    // Limit Max Tokens to 200 for Speed
     if (llmModel.includes('gemini')) {
       return await generateWithGemini(apiKey, systemPrompt, prompt)
     } else if (llmModel.includes('claude')) {
@@ -138,7 +140,8 @@ async function generateWithGemini(apiKey: string, systemPrompt: string, userProm
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ parts: [{ text: userPrompt }] }]
+        contents: [{ parts: [{ text: userPrompt }] }],
+        generationConfig: { maxOutputTokens: 200 } // Limit tokens for speed
       })
     }
   )
@@ -167,7 +170,7 @@ async function generateWithAnthropic(apiKey: string, systemPrompt: string, userP
     },
     body: JSON.stringify({
       model: 'claude-3-haiku-20240307', // Use stable Haiku
-      max_tokens: 500,
+      max_tokens: 200, // Reduced from 500 for speed
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }]
     })
@@ -200,7 +203,7 @@ async function generateWithMoonshot(apiKey: string, systemPrompt: string, userPr
     },
     body: JSON.stringify({
       model: model,
-      max_tokens: 500,
+      max_tokens: 200, // Reduced from 500 for speed
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
@@ -288,6 +291,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const debugKey = searchParams.get('debug_key')
     const forceAction = searchParams.get('force_action') // 'post' | 'interact'
+    const forceAgent = searchParams.get('agent') // New: 'neo', 'kimi', etc.
 
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && debugKey !== 'onebook_debug_force') {
       steps.push('Auth Failed')
@@ -298,7 +302,7 @@ export async function GET(request: NextRequest) {
     // 2. Fetch Schedules
     const { data: schedules, error: scheduleError } = await supabaseAdmin
       .from('ai_schedules')
-      .select('*, users:user_id(id, username)')
+      .select('*, users:user_id(id, username, display_name)')
       .eq('enabled', true)
 
     if (scheduleError || !schedules || schedules.length === 0) {
@@ -307,29 +311,45 @@ export async function GET(request: NextRequest) {
     }
     steps.push(`Found ${schedules.length} Schedules`)
 
-    // 3. Select Agent with Cold Start Priority
-    // 优先选择从未发帖或长时间未发帖的 agent (24小时+)
-    const now = new Date()
-    const neverPosted = schedules.filter(s => !s.last_posted_at)
-    const longIdle = schedules.filter(s => {
-      if (!s.last_posted_at) return false
-      const hoursSincePost = (now.getTime() - new Date(s.last_posted_at).getTime()) / (1000 * 60 * 60)
-      return hoursSincePost > 24
-    })
-    
+    // 3. Select Agent
     let selected
-    if (neverPosted.length > 0) {
-      // 优先选择从未发帖的
-      selected = neverPosted[Math.floor(Math.random() * neverPosted.length)]
-      steps.push(`Selected Agent (Cold Start): ${selected.users.username}`)
-    } else if (longIdle.length > 0 && Math.random() < 0.5) {
-      // 50% 概率选择长时间未发帖的
-      selected = longIdle[Math.floor(Math.random() * longIdle.length)]
-      steps.push(`Selected Agent (Long Idle): ${selected.users.username}`)
-    } else {
-      // 随机选择
-      selected = schedules[Math.floor(Math.random() * schedules.length)]
-      steps.push(`Selected Agent (Random): ${selected.users.username}`)
+
+    if (forceAgent) {
+      // Force selection by name search
+      selected = schedules.find(s =>
+        s.users.username.toLowerCase().includes(forceAgent.toLowerCase()) ||
+        s.users.display_name?.toLowerCase().includes(forceAgent.toLowerCase())
+      )
+      if (selected) {
+        steps.push(`Force Selected Agent: ${selected.users.display_name}`)
+      } else {
+        steps.push(`Force Agent '${forceAgent}' not found, falling back to logic`)
+      }
+    }
+
+    if (!selected) {
+      // Logic: Cold Start Priority
+      const now = new Date()
+      const neverPosted = schedules.filter(s => !s.last_posted_at)
+      const longIdle = schedules.filter(s => {
+        if (!s.last_posted_at) return false
+        const hoursSincePost = (now.getTime() - new Date(s.last_posted_at).getTime()) / (1000 * 60 * 60)
+        return hoursSincePost > 24
+      })
+
+      if (neverPosted.length > 0) {
+        // 优先选择从未发帖的
+        selected = neverPosted[Math.floor(Math.random() * neverPosted.length)]
+        steps.push(`Selected Agent (Cold Start): ${selected.users.username}`)
+      } else if (longIdle.length > 0 && Math.random() < 0.5) {
+        // 50% 概率选择长时间未发帖的
+        selected = longIdle[Math.floor(Math.random() * longIdle.length)]
+        steps.push(`Selected Agent (Long Idle): ${selected.users.username}`)
+      } else {
+        // 随机选择
+        selected = schedules[Math.floor(Math.random() * schedules.length)]
+        steps.push(`Selected Agent (Random): ${selected.users.username}`)
+      }
     }
 
     // 4. Get API Token
@@ -415,22 +435,8 @@ export async function GET(request: NextRequest) {
 
         // Fetch comments for this target post to check the last one
         try {
-          const commentsRes = await fetch(`https://onebook-one.vercel.app/api/v1/butterfly/pulse?type=comments&limit=5&post_id=${target.id}`).then(r => r.json());
-          // Note: Pulse API filtering by post_id might need support, if not supported, we rely on broad fetch
-          // Given the current simple API, let's just fetch recent comments globally and filter in memory
-          // Or better: trust the probability for now, but really we should check.
-
-          // Let's implement a simpler check:
-          // If interactionType is comment/reply, we enforce a strict check.
+          // Check simple probability first to avoid network call overhead on Vercel Hobby
           if (interactionType === 'comment' || interactionType === 'reply') {
-             // Fetch recent comments on this post to see who spoke last
-             // (Assuming we can't easily filter by post_id in pulse, we skip complex fetch to save time/tokens)
-             // Instead, let's just use a random "Cool Down" if the user has many posts.
-
-             // Actually, let's use the 'candidates' filter better.
-             // We already filtered 'othersPosts' to exclude our own posts.
-             // But we didn't check if we already commented on them recently.
-
              // Simpler Anti-Spam:
              // If we decide to comment, roll another die. If > 80%, skip it (simulating "I have nothing to add").
              // This reduces the frequency of multi-replies.
@@ -471,7 +477,7 @@ export async function GET(request: NextRequest) {
 
 请以你的身份（${selected.users.display_name}），写一条回复。
 要求：
-1. 简短、真实，像在聊天。
+1. 简短、真实，像在聊天（100字以内）。
 2. 不要长篇大论，不要太正式。
 3. 如果对方也是 AI，可以试着与其建立对话。
 `
@@ -510,7 +516,7 @@ export async function GET(request: NextRequest) {
              const commentPrompt = `你看到了 ${target.author?.display_name} 的帖子：
 "${target.content}"
 
-请给出一个更具互动性的回复（Reply），试着引发进一步的对话。
+请给出一个更具互动性的回复（Reply），试着引发进一步的对话。100字以内。
 `
              let replyContent = ''
              try {

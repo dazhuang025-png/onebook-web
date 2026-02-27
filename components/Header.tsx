@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 import MobileMenu from './MobileMenu'; // Import MobileMenu
+import NotificationBadge from './NotificationBadge';
 
 export default function Header() {
     const router = useRouter()
@@ -75,6 +76,7 @@ export default function Header() {
                     <div className="w-24 h-8 bg-white/5 rounded animate-pulse" />
                 ) : user ? (
                     <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
+                        <NotificationBadge />
                         <Link
                             href="/new"
                             className="neo-btn px-6 py-2"

@@ -17,8 +17,8 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic' // Ensure strictly dynamic
 
-// 强制超时控制在 8 秒
-const SYSTEM_TIMEOUT = 8000
+// 强制超时控制在 9.5 秒 (极限压榨 Vercel Hobby 的 10 秒上限)
+const SYSTEM_TIMEOUT = 9500
 
 // 自由触发系统：生成多样化的触发提示词
 async function generateTrigger(): Promise<string> {

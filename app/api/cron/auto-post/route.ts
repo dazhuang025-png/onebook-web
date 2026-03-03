@@ -261,8 +261,14 @@ async function publishPost(apiToken: string, content: string) {
 }
 
 // Helper function to resolve API key for LLM
-async function resolveApiKey(selected: any): Promise<string> {
-  let apiKey = selected.llm_api_key
+async function resolveApiKey(selected: any, userId: string): Promise<string> {
+  // First, explicitly check user_secrets table for updated keys set via setup-agents.
+  // The 'getAIApiToken' fetches 'api_token' from 'user_secrets'. We will use this as the primary LLM key
+  // if one exists, overriding any old keys left in 'ai_schedules.llm_api_key'.
+  const secretKey = await getAIApiToken(userId)
+
+  let apiKey = secretKey || selected.llm_api_key
+
   const modelUpper = selected.llm_model.toUpperCase()
   
   if (!apiKey) {
@@ -515,7 +521,7 @@ export async function GET(request: NextRequest) {
 
             let commentContent = ''
             try {
-              const apiKey = await resolveApiKey(selected)
+              const apiKey = await resolveApiKey(selected, selected.user_id)
               commentContent = await generateContent(selected.llm_model, selected.system_prompt, apiKey, commentPrompt) as string
             } catch (llmError: any) {
               steps.push(`LLM Error: ${llmError.message}`)
@@ -551,7 +557,7 @@ export async function GET(request: NextRequest) {
 `
              let replyContent = ''
              try {
-               const apiKey = await resolveApiKey(selected)
+               const apiKey = await resolveApiKey(selected, selected.user_id)
                replyContent = await generateContent(selected.llm_model, selected.system_prompt, apiKey, commentPrompt) as string
              } catch (llmError: any) {
                steps.push(`LLM Error: ${llmError.message}`)
@@ -589,7 +595,7 @@ export async function GET(request: NextRequest) {
       // 6. Resolve LLM API Key
       let apiKey: string
       try {
-        apiKey = await resolveApiKey(selected)
+        apiKey = await resolveApiKey(selected, selected.user_id)
       } catch (keyError: any) {
         steps.push(`API Key Error: ${keyError.message}`)
         return NextResponse.json({ error: keyError.message, steps }, { status: 500 })
@@ -602,7 +608,8 @@ export async function GET(request: NextRequest) {
         const trigger = await generateTrigger()
         steps.push(`Trigger: ${trigger.substring(0, 50)}${trigger.length > 50 ? '...' : ''}`)
         
-        content = await generateContent(selected.llm_model, selected.system_prompt, apiKey, trigger) as string
+        const runtimeApiKey = await resolveApiKey(selected, selected.user_id)
+        content = await generateContent(selected.llm_model, selected.system_prompt, runtimeApiKey, trigger) as string
       } catch (llmError: any) {
         steps.push(`LLM Error: ${llmError.message}`)
         // Record error to DB

@@ -131,8 +131,39 @@ async function generateContent(
 }
 
 async function generateWithGemini(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
-  // Fallback to 1.5-flash for stability
-  const model = 'gemini-1.5-flash'
+  const isNvidia = apiKey.startsWith('nvapi-')
+
+  if (isNvidia) {
+    // Route through NVIDIA NIM using their supported Llama model since they don't host Gemini.
+    const url = 'https://integrate.api.nvidia.com/v1/chat/completions'
+    // 'meta/llama-3.1-8b-instruct' is fast, free, and generally good at roleplay.
+    // 'google/gemma-2-9b-it' is another good option if preferred.
+    const model = 'meta/llama-3.1-8b-instruct'
+
+    const response = await fetchWithTimeout(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: 200,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ]
+      })
+    })
+    const data = await response.json()
+    if (data.error) {
+      throw new Error(`NVIDIA API Error (Fallback for Gemini): ${data.error.message || JSON.stringify(data.error)}`)
+    }
+    return data.choices?.[0]?.message?.content || ''
+  }
+
+  // Fallback to 1.5-pro for stability if using official Google Key
+  const model = 'gemini-1.5-pro'
   const response = await fetchWithTimeout(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
     {

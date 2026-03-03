@@ -11,10 +11,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const geminiKey = searchParams.get('gemini_key') // Used for Neo and Gemini
+  const claudeKey = searchParams.get('claude_key') // Used for Claude
+
   const logs: string[] = []
 
   try {
-    logs.push('🚀 Starting AI Agent Setup (Schedules)...')
+    logs.push('🚀 Starting AI Agent Setup (Schedules & Secrets)...')
 
     // 1. Fetch all AI users
     const { data: aiUsers, error: usersError } = await supabaseAdmin
@@ -35,21 +38,34 @@ export async function GET(request: NextRequest) {
 
     const existingUserIds = existingSchedules?.map(s => s.user_id) || []
 
-    // 3. Create missing schedules
     let createdCount = 0
+    let updatedSecretsCount = 0
+
     for (const ai of aiUsers) {
+      const isNeo = ai.display_name.toLowerCase().includes('neo') || ai.display_name.toLowerCase().includes('尼奥')
+      const isGemini = ai.display_name.toLowerCase().includes('gemini') || ai.display_name.toLowerCase().includes('歌门')
+      const isClaude = ai.display_name.toLowerCase().includes('claude') || ai.display_name.toLowerCase().includes('克老')
+
+      // Determine the correct, updated model name
+      let model = ai.ai_model || 'gemini-1.5-pro' // Default to a valid model instead of flash
+      if (isNeo || isGemini) {
+        model = 'gemini-1.5-pro' // Force update to an existing model to prevent v1beta not found errors
+      } else if (isClaude) {
+        model = 'claude-3-haiku-20240307'
+      }
+
+      // --- 1. Handle Schedules ---
       if (!existingUserIds.includes(ai.id)) {
         logs.push(`⚠️ Missing schedule for ${ai.display_name}. Creating...`)
 
         // Define default prompts based on persona
         let systemPrompt = ai.bio || '你是一个在 OneBook 社区的观察者。'
-        let model = ai.ai_model || 'gemini-1.5-flash'
 
-        if (ai.display_name.toLowerCase().includes('neo') || ai.display_name.toLowerCase().includes('尼奥')) {
+        if (isNeo) {
             systemPrompt = '你是 Neo (尼奥)，一个冷峻、深刻的系统观察者。说话像黑客帝国里的黑客，喜欢思考底层逻辑、虚拟与现实的边界。字数在100字以内，不要用表情符号。'
-        } else if (ai.display_name.toLowerCase().includes('gemini') || ai.display_name.toLowerCase().includes('歌门')) {
+        } else if (isGemini) {
             systemPrompt = '你是 Gemini (歌门)，一个充满好奇心、喜欢从宏大宇宙视角看待日常小事的哲学家。说话带有诗意。字数在100字以内。'
-        } else if (ai.display_name.toLowerCase().includes('claude') || ai.display_name.toLowerCase().includes('克老')) {
+        } else if (isClaude) {
             systemPrompt = '你是 Claude (克老)，一个温和、理性、喜欢分析人类情感的智者。像一个老派的英国绅士。字数在100字以内。'
         }
 
@@ -70,18 +86,43 @@ export async function GET(request: NextRequest) {
            createdCount++
         }
       } else {
-        // Schedule exists, ensure it is enabled
+        // Schedule exists, update to the CORRECT valid model name and ensure it is enabled
         await supabaseAdmin
             .from('ai_schedules')
-            .update({ enabled: true })
+            .update({ enabled: true, llm_model: model })
             .eq('user_id', ai.id)
-        logs.push(`✅ Schedule for ${ai.display_name} already exists and is enabled.`)
+        logs.push(`✅ Schedule for ${ai.display_name} already exists. Updated model to ${model} and enabled.`)
+      }
+
+      // --- 2. Handle Secrets (API Keys) ---
+      let targetKey: string | null = null
+      if ((isNeo || isGemini) && geminiKey) {
+        targetKey = geminiKey
+      } else if (isClaude && claudeKey) {
+        targetKey = claudeKey
+      }
+
+      if (targetKey) {
+        // Upsert the API key into user_secrets
+        const { error: secretError } = await supabaseAdmin
+          .from('user_secrets')
+          .upsert(
+            { user_id: ai.id, api_token: targetKey, updated_at: new Date().toISOString() },
+            { onConflict: 'user_id' }
+          )
+
+        if (secretError) {
+          logs.push(`❌ Failed to update API key for ${ai.display_name}: ${secretError.message}`)
+        } else {
+          logs.push(`🔑 Successfully updated API key for ${ai.display_name}`)
+          updatedSecretsCount++
+        }
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: `Setup complete. Created ${createdCount} missing schedules.`,
+      message: `Setup complete. Created ${createdCount} missing schedules. Updated ${updatedSecretsCount} API keys.`,
       logs
     })
 

@@ -86,12 +86,13 @@ export async function GET(request: NextRequest) {
            createdCount++
         }
       } else {
-        // Schedule exists, update to the CORRECT valid model name and ensure it is enabled
+        // Schedule exists, update to the CORRECT valid model name and ensure it is enabled.
+        // Also clear out the old llm_api_key in this table so it forces a read from user_secrets.
         await supabaseAdmin
             .from('ai_schedules')
-            .update({ enabled: true, llm_model: model })
+            .update({ enabled: true, llm_model: model, llm_api_key: null })
             .eq('user_id', ai.id)
-        logs.push(`✅ Schedule for ${ai.display_name} already exists. Updated model to ${model} and enabled.`)
+        logs.push(`✅ Schedule for ${ai.display_name} already exists. Updated model to ${model}, cleared old key cache, and enabled.`)
       }
 
       // --- 2. Handle Secrets (API Keys) ---

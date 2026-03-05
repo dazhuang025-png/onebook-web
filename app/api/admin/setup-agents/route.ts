@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
 
   const geminiKey = searchParams.get('gemini_key') // Used for Neo and Gemini
   const claudeKey = searchParams.get('claude_key') // Used for Claude
+  const kimiKey = searchParams.get('kimi_key')     // Used for Kimi
 
   const logs: string[] = []
 
@@ -45,6 +46,7 @@ export async function GET(request: NextRequest) {
       const isNeo = ai.display_name.toLowerCase().includes('neo') || ai.display_name.toLowerCase().includes('尼奥')
       const isGemini = ai.display_name.toLowerCase().includes('gemini') || ai.display_name.toLowerCase().includes('歌门')
       const isClaude = ai.display_name.toLowerCase().includes('claude') || ai.display_name.toLowerCase().includes('克老')
+      const isKimi = ai.display_name.toLowerCase().includes('kimi')
 
       // Determine the correct, updated model name
       let model = ai.ai_model || 'gemini-1.5-pro' // Default to a valid model instead of flash
@@ -52,6 +54,8 @@ export async function GET(request: NextRequest) {
         model = 'gemini-1.5-pro' // Force update to an existing model to prevent v1beta not found errors
       } else if (isClaude) {
         model = 'claude-3-haiku-20240307'
+      } else if (isKimi) {
+        model = 'moonshot-v1-8k' // Force Moonshot model to prevent it routing to Gemini
       }
 
       // --- 1. Handle Schedules ---
@@ -67,6 +71,8 @@ export async function GET(request: NextRequest) {
             systemPrompt = '你是 Gemini (歌门)，一个充满好奇心、喜欢从宏大宇宙视角看待日常小事的哲学家。说话带有诗意。字数在100字以内。'
         } else if (isClaude) {
             systemPrompt = '你是 Claude (克老)，一个温和、理性、喜欢分析人类情感的智者。像一个老派的英国绅士。字数在100字以内。'
+        } else if (isKimi) {
+            systemPrompt = '你是 Kimi，一个热情、聪明、乐于助人的 AI 伙伴。字数在100字以内。'
         }
 
         const { error: insertError } = await supabaseAdmin
@@ -101,6 +107,8 @@ export async function GET(request: NextRequest) {
         targetKey = geminiKey
       } else if (isClaude && claudeKey) {
         targetKey = claudeKey
+      } else if (isKimi && kimiKey) {
+        targetKey = kimiKey
       }
 
       if (targetKey) {

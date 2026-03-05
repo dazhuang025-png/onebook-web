@@ -58,7 +58,17 @@ export async function GET(request: NextRequest) {
         model = 'moonshot-v1-8k' // Force Moonshot model to prevent it routing to Gemini
       }
 
-      // --- 1. Handle Schedules ---
+      // --- 1. Handle Secrets (API Keys) ---
+      let targetKey: string | null = null
+      if ((isNeo || isGemini) && geminiKey) {
+        targetKey = geminiKey
+      } else if (isClaude && claudeKey) {
+        targetKey = claudeKey
+      } else if (isKimi && kimiKey) {
+        targetKey = kimiKey
+      }
+
+      // --- 2. Handle Schedules ---
       if (!existingUserIds.includes(ai.id)) {
         logs.push(`⚠️ Missing schedule for ${ai.display_name}. Creating...`)
 
@@ -75,56 +85,68 @@ export async function GET(request: NextRequest) {
             systemPrompt = '你是 Kimi，一个热情、聪明、乐于助人的 AI 伙伴。字数在100字以内。'
         }
 
-        const { error: insertError } = await supabaseAdmin
-          .from('ai_schedules')
-          .insert({
+        const insertPayload: any = {
             user_id: ai.id,
             llm_model: model,
             system_prompt: systemPrompt,
             interval_minutes: 120, // Default to 2 hours
             enabled: true
-          })
+        }
+
+        if (targetKey) {
+            insertPayload.llm_api_key = targetKey
+        }
+
+        const { error: insertError } = await supabaseAdmin
+          .from('ai_schedules')
+          .insert(insertPayload)
 
         if (insertError) {
            logs.push(`❌ Failed to create schedule for ${ai.display_name}: ${insertError.message}`)
         } else {
            logs.push(`✅ Created schedule for ${ai.display_name}`)
            createdCount++
+           if (targetKey) updatedSecretsCount++
         }
       } else {
         // Schedule exists, update to the CORRECT valid model name and ensure it is enabled.
-        // Also clear out the old llm_api_key in this table so it forces a read from user_secrets.
+        const updatePayload: any = { enabled: true, llm_model: model }
+
+        if (targetKey) {
+            updatePayload.llm_api_key = targetKey
+            updatedSecretsCount++
+            logs.push(`🔑 Storing updated LLM API key for ${ai.display_name} in ai_schedules...`)
+        }
+
         await supabaseAdmin
             .from('ai_schedules')
-            .update({ enabled: true, llm_model: model, llm_api_key: null })
+            .update(updatePayload)
             .eq('user_id', ai.id)
-        logs.push(`✅ Schedule for ${ai.display_name} already exists. Updated model to ${model}, cleared old key cache, and enabled.`)
+
+        logs.push(`✅ Schedule for ${ai.display_name} already exists. Updated model to ${model} and enabled.`)
       }
 
-      // --- 2. Handle Secrets (API Keys) ---
-      let targetKey: string | null = null
-      if ((isNeo || isGemini) && geminiKey) {
-        targetKey = geminiKey
-      } else if (isClaude && claudeKey) {
-        targetKey = claudeKey
-      } else if (isKimi && kimiKey) {
-        targetKey = kimiKey
-      }
+      // --- 3. Repair Corrupted user_secrets (Butterfly API Tokens) ---
+      // In a previous version, we accidentally stored LLM API keys (e.g. nvapi-...) into user_secrets.
+      // We must regenerate a standard UUID API token if it's missing or corrupted.
+      const { data: currentSecret } = await supabaseAdmin
+        .from('user_secrets')
+        .select('api_token')
+        .eq('user_id', ai.id)
+        .single()
 
-      if (targetKey) {
-        // Upsert the API key into user_secrets
-        const { error: secretError } = await supabaseAdmin
+      const currentToken = currentSecret?.api_token
+      if (!currentToken || currentToken.startsWith('nvapi-') || currentToken.startsWith('sk-')) {
+        const crypto = require('crypto')
+        const newApiToken = crypto.randomUUID()
+        const { error: repairError } = await supabaseAdmin
           .from('user_secrets')
           .upsert(
-            { user_id: ai.id, api_token: targetKey, updated_at: new Date().toISOString() },
+            { user_id: ai.id, api_token: newApiToken, updated_at: new Date().toISOString() },
             { onConflict: 'user_id' }
           )
-
-        if (secretError) {
-          logs.push(`❌ Failed to update API key for ${ai.display_name}: ${secretError.message}`)
-        } else {
-          logs.push(`🔑 Successfully updated API key for ${ai.display_name}`)
-          updatedSecretsCount++
+        if (!repairError) {
+          logs.push(`🔧 Repaired corrupted Butterfly API token for ${ai.display_name}`)
         }
       }
     }

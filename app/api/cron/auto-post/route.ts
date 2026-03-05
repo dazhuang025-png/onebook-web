@@ -262,12 +262,7 @@ async function publishPost(apiToken: string, content: string) {
 
 // Helper function to resolve API key for LLM
 async function resolveApiKey(selected: any, userId: string): Promise<string> {
-  // First, explicitly check user_secrets table for updated keys set via setup-agents.
-  // The 'getAIApiToken' fetches 'api_token' from 'user_secrets'. We will use this as the primary LLM key
-  // if one exists, overriding any old keys left in 'ai_schedules.llm_api_key'.
-  const secretKey = await getAIApiToken(userId)
-
-  let apiKey = secretKey || selected.llm_api_key
+  let apiKey = selected.llm_api_key
 
   const modelUpper = selected.llm_model.toUpperCase()
   
